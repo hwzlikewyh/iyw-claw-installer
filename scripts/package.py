@@ -9,6 +9,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import tarfile
 import zipfile
 
@@ -22,6 +23,7 @@ WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 def run(*args):
     result = subprocess.run([str(arg) for arg in args], check=True, text=True,
+                            encoding="utf-8", errors="replace",
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print(result.stdout, end="")
     return result.stdout
@@ -136,7 +138,7 @@ def linux():
     (metadata / "control").write_text(
         f"Package: yuan-assistant-installer\nVersion: {VERSION}\nArchitecture: {deb_arch}\n"
         "Maintainer: IYW <hwzlikewyh@users.noreply.github.com>\nSection: utils\nPriority: optional\n"
-        "Depends: libc6 (>= 2.35), libstdc++6 (>= 11), libgtk-3-0, libcurl4, libarchive13, libsodium23, libwebkit2gtk-4.1-0\n"
+        "Depends: libc6 (>= 2.35), libstdc++6 (>= 11), libgtk-3-0, libsm6, libcurl4, libarchive13, libsodium23, libwebkit2gtk-4.1-0\n"
         "Recommends: fonts-noto-cjk\nDescription: Yuan Assistant online setup wizard\n",
         encoding="utf-8")
     run("dpkg-deb", "--root-owner-group", "--build", folder,
@@ -160,6 +162,7 @@ def checksums():
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("target", choices=("windows", "macos", "linux"))
     options = parser.parse_args()
