@@ -4,6 +4,15 @@
 构建入口：GitHub Actions → Build installers → Run workflow。
 推送 main 分支中的源码、资源或构建脚本变更也会启动构建。
 
+2026-11-10，四项原生构建和启动检查全部通过：
+[Actions 42726267427](https://github.com/hwzlikewyh/iyw-claw-installer/actions/runs/42726267427)。
+构建源码提交为 `3dd55ac18f21e2d1adc3b769d44c53861a2886de`。
+8 个安装产物和汇总 SHA-256 清单已保存在
+[v0.1.0 下载页](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.1.0)。
+
+本机下载目录：`dist/release-0.1.0/`，按系统分文件夹；8 个文件下载后摘要核对全部通过。
+Windows EXE 约 3.62 MiB，macOS 通用 DMG 约 4.56 MiB，Linux DEB 约 2.20–2.36 MiB。
+
 ## 交付矩阵
 
 | 平台 | 构建机 | 产物 | 目标系统 |
@@ -69,3 +78,4 @@ Gatekeeper 仍会将互联网下载的文件视为未经公证的应用。当前
 - GitHub runner 规格：https://docs.github.com/en/actions/reference/runners/github-hosted-runners
 - wxWidgets 源码：https://github.com/wxWidgets/wxWidgets/releases/tag/v3.2.12
 - sodium 源码：https://github.com/jedisct1/libsodium/releases/tag/1.0.22-RELEASE
+- archive 源码：https://github.com/libarchive/libarchive/releases/tag/v3.8.11

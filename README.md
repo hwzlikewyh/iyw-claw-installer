@@ -4,6 +4,10 @@ C++17 + wxWidgets 3.2 原生安装入口。Windows 对外一个 `原助理安装
 入口采用 32 位构建，可在 32/64 位 Windows 启动，并按原生系统与架构选择 Fusion 制品。
 产品名称统一为“原助理”。
 
+源码仓库：[hwzlikewyh/iyw-claw-installer](https://github.com/hwzlikewyh/iyw-claw-installer)。
+下载：[0.1.0 三端候选版](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.1.0)。
+三端构建方式、产物格式和运行依赖见 [构建说明](docs/builds.md)。
+
 ## 使用
 
 运行 `dist/原助理安装向导.exe` → 开始安装 → 确认位置 → 下载并安装 → 启动原助理。
@@ -62,11 +66,13 @@ Linux 检查 glibc 2.35+、GTK 3、WebKitGTK 4.1；从签名 AppImage 解包运�
 两端先在用户目录暂存，保留旧 app 备份，环境和应用检查失败时恢复旧 app。
 系统库缺失时提供具体包名；Node、Git、uv 等受管组件由环境助手补齐。
 
-当前已实测 Windows 11；Linux 平台代码通过真实目标头文件的编译语法检查，
-macOS/Linux/Win7 仍需原生构建、安装、升级和运行验收，不能据此声称已全部支持。
+当前已实测 Windows 11 安装复用；macOS 通用版及 Linux x64/ARM64 已完成原生编译、
+打包和欢迎窗口启动检查。Win7、更多系统版本，以及 macOS/Linux 的完整安装、升级、
+回退与环境补齐仍需实机验收，不能将构建成功等同于全部兼容性验收。
 相邻 `iyw-claw` 环境助手已移除无条件排除 Open Computer Use 的过滤；
 这项修复需随新版正式应用发布后，旧 Linux 制品才会获得相应行为。
 
 源码与验证记录见 `docs/design.md`、`docs/verification.md`，最新截图为 `docs/final-*.png`。
 安装动效演示见 `docs/install-motion.gif`，使用隔离模拟进度录制，正式程序仍按实际进度运行。
-向导自身未签名，当前提供本地候选；依赖许可证随 dist 附带。
+Windows 向导未做发布证书签名，macOS 仅作 ad-hoc 签名、未做 Apple 公证。
+当前提供构建候选；依赖许可证随打包目录附带。
