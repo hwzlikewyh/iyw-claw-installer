@@ -1,0 +1,8 @@
+/build/
+/build-online/
+/build-*/
+/.cache/
+/.taste-skill/
+/dist/
+/packages/
+__pycache__/

@@ -1,0 +1,76 @@
+cmake_minimum_required(VERSION 3.24)
+if(APPLE)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "13.5" CACHE STRING "Minimum supported macOS version")
+endif()
+project(IywClawInstaller VERSION 0.1.0 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(WX_SOURCE_DIR "" CACHE PATH "wxWidgets 3.2 source directory")
+if(NOT EXISTS "${WX_SOURCE_DIR}/CMakeLists.txt")
+  message(FATAL_ERROR "Set WX_SOURCE_DIR to the wxWidgets 3.2 source directory")
+endif()
+set(wxBUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(wxBUILD_USE_STATIC_RUNTIME ON CACHE BOOL "" FORCE)
+set(wxBUILD_DEBUG_LEVEL 0 CACHE STRING "" FORCE)
+set(wxBUILD_SAMPLES OFF CACHE STRING "" FORCE)
+set(wxBUILD_TESTS OFF CACHE STRING "" FORCE)
+set(wxBUILD_DEMOS OFF CACHE BOOL "" FORCE)
+set(wxBUILD_INSTALL OFF CACHE BOOL "" FORCE)
+foreach(feature IN ITEMS WEBVIEW STC RICHTEXT MEDIACTRL XRC XML HTML AUI RIBBON PROPGRID GL
+    HELP WXHTML_HELP MS_HTML_HELP SVG)
+  set(wxUSE_${feature} OFF CACHE BOOL "" FORCE)
+endforeach()
+foreach(feature IN ITEMS REGEX LIBJPEG LIBPNG LIBTIFF EXPAT)
+  set(wxUSE_${feature} OFF CACHE STRING "" FORCE)
+endforeach()
+set(wxUSE_ZLIB OFF CACHE STRING "" FORCE)
+set(wxUSE_ZIPSTREAM OFF CACHE BOOL "" FORCE)
+set(wxUSE_NANOSVG OFF CACHE BOOL "" FORCE)
+set(wxUSE_ARTPROVIDER_TANGO OFF CACHE BOOL "" FORCE)
+add_subdirectory("${WX_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/wx" EXCLUDE_FROM_ALL)
+add_executable(iyw-installer WIN32 MACOSX_BUNDLE
+  src/main.cpp src/installer.cpp src/release.cpp src/download.cpp src/progress.cpp src/environment.cpp
+  src/environment_plan.cpp src/environment_inventory.cpp src/environment_prefetch.cpp src/controls.cpp
+  src/window.cpp src/window_paint.cpp src/window_art.cpp src/window_motion.cpp src/window_progress.cpp src/window_actions.cpp)
+target_link_libraries(iyw-installer PRIVATE wx::core wx::base)
+target_compile_definitions(iyw-installer PRIVATE wxDEBUG_LEVEL=0)
+target_include_directories(iyw-installer PRIVATE resources vendor)
+set_target_properties(iyw-installer PROPERTIES
+  OUTPUT_NAME "原助理安装向导"
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+  MACOSX_BUNDLE_BUNDLE_NAME "原助理安装向导"
+  MACOSX_BUNDLE_GUI_IDENTIFIER "cn.iyw.installer")
+if(WIN32)
+  target_sources(iyw-installer PRIVATE src/http_windows.cpp src/platform_windows.cpp src/command_windows.cpp
+    src/verify_windows.cpp src/install_windows.cpp)
+  target_link_libraries(iyw-installer PRIVATE winhttp bcrypt wintrust crypt32 version)
+else()
+  find_package(CURL REQUIRED)
+  find_package(LibArchive REQUIRED)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(SODIUM REQUIRED IMPORTED_TARGET libsodium)
+  target_sources(iyw-installer PRIVATE src/platform_unix.cpp src/command_unix.cpp
+    src/http_unix.cpp src/verify_unix.cpp src/archive_unix.cpp src/install_unix.cpp)
+  target_link_libraries(iyw-installer PRIVATE CURL::libcurl LibArchive::LibArchive PkgConfig::SODIUM ${CMAKE_DL_LIBS})
+  target_compile_definitions(iyw-installer PRIVATE _GNU_SOURCE)
+endif()
+if(MSVC)
+  enable_language(ASM_MASM)
+  target_sources(iyw-installer PRIVATE src/windows_clock.cpp)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    target_sources(iyw-installer PRIVATE src/windows_clock_x86.asm)
+  elseif(CMAKE_GENERATOR_PLATFORM STREQUAL "x64" OR
+      (NOT CMAKE_GENERATOR_PLATFORM AND CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64"))
+    target_sources(iyw-installer PRIVATE src/windows_clock_x64.asm)
+  endif()
+  target_compile_options(iyw-installer PRIVATE /utf-8 /W4 /permissive-)
+  target_link_options(iyw-installer PRIVATE /SUBSYSTEM:WINDOWS,6.01)
+  target_sources(iyw-installer PRIVATE resources/app.rc resources/app.manifest)
+endif()
+if(APPLE)
+  set_target_properties(iyw-installer PROPERTIES
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
+endif()

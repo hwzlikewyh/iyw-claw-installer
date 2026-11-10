@@ -1,0 +1,115 @@
+#include "release.h"
+#include <fstream>
+#include <algorithm>
+#include <stdexcept>
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
+namespace setup {
+namespace {
+void ValidateRoot(const fs::path& root, Snapshot& result) {
+    if (root.empty() || !root.is_absolute() || root == root.root_path())
+        throw std::runtime_error("请选择完整的应用文件夹路径，不要选择磁盘根目录。");
+    std::error_code error;
+    auto existing = root;
+    while (!fs::exists(existing, error) && !error) existing = existing.parent_path();
+    if (error || !fs::is_directory(existing)) throw std::runtime_error("安装位置无效，请选择文件夹。");
+    result.availableBytes = fs::space(existing).available;
+    result.destination = root;
+}
+void SaveFailure(const fs::path& directory, Snapshot& result) {
+    if (directory.empty()) return;
+    const auto path = directory / "installer-error.log";
+    std::ofstream log(path, std::ios::binary);
+    if (!log) return;
+    log << "原助理安装向导\n";
+    for (const auto& event : result.events) log << event << '\n';
+    log << result.detail << '\n';
+    if (result.logPath.empty()) result.logPath = path;
+}
+void Execute(FileWork& work) {
+    BeginStage(work, Phase::Checking);
+    ValidateRoot(work.progress.destination, work.progress);
+    const auto platform = CurrentPlatform();
+    CheckSystem(work); CheckEnvironment(work);
+    BeginStage(work, Phase::Resolving);
+    const auto release = ResolveRelease(platform, work.job);
+    {std::ofstream identity(work.staging/"selected-release.txt",std::ios::binary);
+        identity<<release.version<<'\n'<<release.sha256<<'\n';}
+    work.progress.version = release.version;
+    work.progress.events.push_back("Fusion 稳定版：" + release.version + "；平台：" + platform.target + "/" + platform.arch);
+    work.job.Publish(work.progress);
+    ResolvePresetEnvironment(release,work);
+    constexpr std::uint64_t MinimumFree = 2ULL * 1024 * MiB;
+    std::uint64_t presetBytes=0;for(const auto& component:work.progress.presets)presetBytes+=component.bytes;
+    if (work.progress.availableBytes < std::max(MinimumFree, (release.size+presetBytes) * 3))
+        throw std::runtime_error("目标磁盘空间不足，建议至少保留 2 GiB 供应用及环境安装。");
+    if (fs::space(work.staging).available < release.size + 64 * MiB)
+        throw std::runtime_error("临时下载目录空间不足。");
+    const bool reused=ReuseApplication(release,work);
+    if(reused){work.progress.reused[2]=true;work.progress.reused[3]=true;work.progress.reused[5]=true;}
+    if(!reused){DownloadPackage(release,work);VerifyDownload(release,work);}
+    PrefetchEnvironment(work);
+    if(!reused)InstallPackage(release,work);
+    PrepareEnvironment(release, work); VerifyInstalled(release, work);
+    FinishDeployment(work, true);
+    work.progress.phase = Phase::Complete;
+    work.progress.completedStages = StageCount;
+    work.progress.cancellable = false;
+    work.progress.events.push_back("安装器返回成功，主程序版本与签名检查通过。");
+}
+}
+InstallJob::~InstallJob() { Cancel(); Join(); }
+void InstallJob::Cancel() { cancelled_.store(true); }
+void InstallJob::Join() { if (worker_.joinable()) worker_.join(); }
+bool InstallJob::IsCancelled() const { return cancelled_.load(); }
+Snapshot InstallJob::Read() const { std::lock_guard<std::mutex> guard(mutex_); return state_; }
+void InstallJob::Publish(Snapshot value) { std::lock_guard<std::mutex> guard(mutex_); state_ = std::move(value); }
+void InstallJob::Start(const fs::path& root) {
+    Join(); cancelled_.store(false); Snapshot initial; initial.phase = Phase::Checking; initial.destination = root;
+    Publish(initial);
+    try { worker_ = std::thread(&InstallJob::Run, this, root); }
+    catch (const std::exception& error) { initial.phase = Phase::Failed; initial.detail = error.what(); Publish(initial); }
+}
+void InstallJob::Run(fs::path root) {
+#ifdef _WIN32
+    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
+#endif
+    Snapshot result; result.destination = std::move(root);
+    FileWork work{*this, {}, result, std::chrono::steady_clock::now(), {}};
+    try {
+        work.staging = CreateStaging(); Execute(work);
+    } catch (const std::exception& error) {
+        try { FinishDeployment(work, false); } catch (const std::exception& rollback) {
+            result.events.push_back(std::string("应用恢复失败，保留现场：") + rollback.what());
+        }
+        result.phase = IsCancelled() && result.cancellable ? Phase::Cancelled : Phase::Failed;
+        result.detail = result.phase == Phase::Cancelled ? "下载或校验已取消，尚未启动安装。" : error.what();
+        result.events.push_back(result.detail); SaveFailure(work.staging, result);
+    }
+    if(!work.staging.empty()){
+        try{
+            const auto logs=UserHome()/".iyw-claw/logs/installer"/work.staging.filename();fs::create_directories(logs);
+            for(const auto& entry:fs::directory_iterator(work.staging)){
+                if(!entry.is_regular_file())continue;const auto name=entry.path().filename().string();
+                if(name.find(".log")!=std::string::npos||name.find(".stderr")!=std::string::npos)
+                    fs::copy_file(entry.path(),logs/entry.path().filename(),fs::copy_options::overwrite_existing);
+            }
+            if(!result.logPath.empty()&&result.logPath.parent_path()==work.staging)result.logPath=logs/result.logPath.filename();
+        }catch(const std::exception&){result.events.push_back("安装日志暂留下载缓存目录。");}
+    }
+    work.packageLock.reset();
+    std::error_code error;
+    if (!work.staging.empty() && result.phase == Phase::Complete) fs::remove_all(work.staging, error);
+    else if (!work.staging.empty()) {
+        fs::remove(work.staging / "setup.part", error); fs::remove(work.staging / "setup.exe", error);
+        for(const auto& entry:fs::directory_iterator(work.staging,error)){
+            const auto name=entry.path().filename().string();
+            if(entry.is_regular_file()&&name.rfind("env-",0)==0&&entry.path().extension()==".part")fs::remove(entry.path(),error);
+        }
+    }
+    result.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
+    Publish(std::move(result));
+}
+}

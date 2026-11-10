@@ -1,0 +1,5 @@
+EXTERN YuanCompatibleSystemTime:PROC
+.data
+PUBLIC __imp_GetSystemTimePreciseAsFileTime
+__imp_GetSystemTimePreciseAsFileTime QWORD OFFSET YuanCompatibleSystemTime
+END

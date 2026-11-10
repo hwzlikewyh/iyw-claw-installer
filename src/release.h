@@ -1,0 +1,34 @@
+#pragma once
+#include "installer.h"
+#include <functional>
+
+namespace setup {
+inline constexpr char FusionBase[] = "https://gateway.iyw.cn/iyw-fusion-api";
+using Receive = std::function<void(const char*, std::size_t)>;
+Platform CurrentPlatform();
+fs::path DefaultInstallRoot();
+fs::path CreateStaging();
+Release ParseRelease(const std::string& body);
+Release ResolveRelease(const Platform& platform, InstallJob& job);
+void ReadHttps(const std::string& url, const Receive& receive, InstallJob& job);
+void PostHttps(const std::string& url,const std::string& body,const Receive& receive,InstallJob& job);
+bool ReadHttpsRange(const std::string& url, const std::pair<std::uint64_t,std::uint64_t>& range,
+    const Receive& receive, InstallJob& job);
+void DownloadPackage(const Release& release, FileWork& work);
+void VerifyDownload(const Release& release, FileWork& work);
+void InstallPackage(const Release& release, FileWork& work);
+void VerifyInstalled(const Release& release, FileWork& work);
+void LaunchInstalled(const Snapshot& state);
+void CheckSystem(FileWork& work);
+fs::path UserHome();
+fs::path EnvironmentHelper(const fs::path& root);
+void VerifyEnvironmentBinary(const fs::path& helper);
+void CheckEnvironment(FileWork& work);
+void ResolvePresetEnvironment(const Release& release,FileWork& work);
+bool ReuseApplication(const Release& release,FileWork& work);
+std::vector<std::string> MissingPresetComponents(const FileWork& work);
+void PrefetchEnvironment(FileWork& work);
+std::string HashFile(const fs::path& path);
+void PrepareEnvironment(const Release& release, FileWork& work);
+void FinishDeployment(FileWork& work, bool success);
+}
