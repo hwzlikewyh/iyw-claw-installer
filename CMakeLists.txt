@@ -70,6 +70,8 @@ if(MSVC)
   target_sources(iyw-installer PRIVATE resources/app.rc resources/app.manifest)
 endif()
 if(APPLE)
+  find_package(ZLIB REQUIRED)
+  target_link_libraries(iyw-installer PRIVATE ZLIB::ZLIB)
   set_target_properties(iyw-installer PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")

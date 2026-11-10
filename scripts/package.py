@@ -36,6 +36,7 @@ def notices(destination):
     }
     if platform.system() == "Darwin":
         sources[ROOT / ".cache/libsodium-1.0.22/LICENSE"] = "libsodium-LICENSE.txt"
+        sources[ROOT / ".cache/libarchive-3.8.11/COPYING"] = "libarchive-LICENSE.txt"
     for source, name in sources.items():
         shutil.copy2(source, destination / name)
     (destination / "使用说明.txt").write_text(

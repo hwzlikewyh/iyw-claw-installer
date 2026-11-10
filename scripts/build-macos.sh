@@ -6,7 +6,7 @@ export MACOSX_DEPLOYMENT_TARGET=13.5
 sdk_path=$(xcrun --sdk macosx --show-sdk-path)
 dependency_root="$project_dir/.cache/macos-deps"
 mkdir -p "$dependency_root"
-# 静态打包 sodium；网络、归档和图形框架使用 macOS 系统库，不依赖客户安装 Homebrew。
+# 静态打包 sodium 和 archive，网络及图形框架使用系统库，无需客户安装 Homebrew。
 for architecture in arm64 x86_64; do
   build_dir="$dependency_root/build-$architecture"
   mkdir -p "$build_dir"
@@ -36,10 +36,23 @@ Libs: -L\${libdir} -lsodium
 Cflags: -I\${includedir}
 EOF
 export PKG_CONFIG_PATH="$universal/lib/pkgconfig"
+archive_options=()
+for feature in OPENSSL MBEDTLS NETTLE LIBB2 LZ4 LZO LZMA ZSTD BZip2 LIBXML2 \
+    EXPAT BSDXML PCREPOSIX PCRE2POSIX ICONV ACL XATTR TAR CPIO CAT UNZIP TEST; do
+  archive_options+=("-DENABLE_$feature=OFF")
+done
+cmake -S .cache/libarchive-3.8.11 -B "$dependency_root/archive-build" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 \
+  '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_INSTALL_PREFIX="$universal" \
+  -DBUILD_SHARED_LIBS=OFF -DENABLE_ZLIB=ON "${archive_options[@]}" \
+  -DZLIB_INCLUDE_DIR="$sdk_path/usr/include" -DZLIB_LIBRARY="$sdk_path/usr/lib/libz.tbd"
+cmake --build "$dependency_root/archive-build" --parallel 3
+cmake --install "$dependency_root/archive-build"
 cmake -S . -B build-native -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=13.5 \
   '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' \
   -DWX_SOURCE_DIR="$project_dir/.cache/wxWidgets-3.2.12" \
   -DCURL_INCLUDE_DIR="$sdk_path/usr/include" -DCURL_LIBRARY="$sdk_path/usr/lib/libcurl.tbd" \
-  -DLibArchive_INCLUDE_DIR="$sdk_path/usr/include" -DLibArchive_LIBRARY="$sdk_path/usr/lib/libarchive.tbd"
+  -DLibArchive_INCLUDE_DIR="$universal/include" -DLibArchive_LIBRARY="$universal/lib/libarchive.a" \
+  -DZLIB_INCLUDE_DIR="$sdk_path/usr/include" -DZLIB_LIBRARY="$sdk_path/usr/lib/libz.tbd"
 cmake --build build-native --parallel 3
