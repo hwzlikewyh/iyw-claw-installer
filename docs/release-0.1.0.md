@@ -18,6 +18,11 @@ Windows ZIP 额外附带依赖许可证；macOS ZIP 和 DMG 包含同一应用�
 这些检查不会执行正式应用安装，Win7 和各系统的完整安装/升级/回退仍需实机验收。
 Windows EXE（含 ZIP 内程序）已用“厦门市虹约产品设计有限公司”的正式证书完成
 Authenticode 签名和 DigiCert RFC 3161 时间戳，发布者与信任链校验通过。
-macOS 当前仍为 ad-hoc 签名，Developer ID 签名等待证书导出密码，Apple 公证尚未完成。
+macOS 应用与 DMG 已用 Xiamen Hongyue Product Design Co.,Ltd. 的 Developer ID Application
+证书正式签名，含安全时间戳，签名验证和启动检查通过。Apple 公证尚未完成。
+附件 `macos-signing-report.json` 记录了签名和公证状态。
+
+Windows 新程序即使签名有效，也可能显示 SmartScreen“无法识别的应用”提醒。
+这项检查还依据文件和发布者信誉；签名不会立即建立下载信誉。请确认下载来源与发行者后操作。
 
 本版不改变 Fusion 当前 stable 选择策略，安装向导版本与应用版本独立。

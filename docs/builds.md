@@ -7,7 +7,7 @@
 2026-11-10，四项原生构建和启动检查全部通过：
 [Actions 42726267427](https://github.com/hwzlikewyh/iyw-claw-installer/actions/runs/42726267427)。
 构建源码提交为 `3dd55ac18f21e2d1adc3b769d44c53861a2886de`。
-8 个安装产物和汇总 SHA-256 清单已保存在
+8 个安装产物、macOS 签名报告和汇总 SHA-256 清单已保存在
 [v0.1.0 下载页](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.1.0)。
 
 本机下载目录：`dist/release-0.1.0/`，按系统分文件夹；8 个文件下载后摘要核对全部通过。
@@ -71,9 +71,10 @@ Linux 使用 ldd 检查没有缺失动态库，并生成声明依赖的 DEB。
 
 基础构建工作流产出未做发布证书签名的候选。v0.1.0 的 Windows 发布下载文件已另外完成
 正式 Authenticode 签名与 RFC 3161 时间戳验证，签名后重新打包并更新摘要。
-macOS 当前仍作 ad-hoc 签名，Developer ID 签名等待证书导出密码，尚无 Apple 公证；
+macOS 发布下载文件已另外完成 Developer ID 签名、安全时间戳和签名后启动检查，尚无 Apple 公证；
 Gatekeeper 仍会将互联网下载的文件视为未经公证的应用。当前包应作为候选体验版。
 签名步骤和输入要求见 [签名说明](signing.md)。
+Windows 新程序仍可能因 SmartScreen 文件信誉不足而提示确认，这不等同于签名无效。
 
 ## 一手构建资料
 

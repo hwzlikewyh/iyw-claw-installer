@@ -24,6 +24,20 @@ Windows EXE SHA-256：
 Windows ZIP SHA-256：
 `484ebd4fdae1fbd979267c5a966b3cb1b5da510a091e9e4f638ae3031d6f1835`。
 
+### SmartScreen 提示核查
+
+用户反馈“Windows 已保护你的电脑”，发行者已正确显示公司名称。
+实际检查 Downloads 中的 `YuanAssistant-Setup-windows (1).exe`：签名状态 Valid、时间戳存在，
+SHA-256 与上述正式发布 EXE 完全一致。
+
+微软官方文档明确，SmartScreen 同时评估发布者信誉和文件摘要信誉；新二进制即使使用
+OV/EV 证书仍可能提示“无法识别的应用”。EV 不再提供首次下载免提示保证。
+普通消费者端没有手动提交文件以获得 SmartScreen 信誉审核的入口；信誉随真实下载和使用积累，
+没有固定通过次数或时间。保持同一签名身份、稳定的分发文件，避免仅为消除提示反复重签。
+此提示不等同于 Defender 已检出恶意软件；若出现明确威胁名称，应另走检测误报核查流程。
+
+官方依据：https://learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation
+
 ## macOS
 
 工作流 `Sign macOS installer` 对已有 universal ZIP 做签名，不重新编译应用。
@@ -48,8 +62,22 @@ p12 导入临时 keychain，签名结束无论成功或失败都会清理证书�
 并对 app 做 Gatekeeper 检查。未提供凭据时报告 `not-submitted`，不得声称已经公证。
 部分提供公证凭据、签名验证失败或公证不被接受都会使任务失败，不降级签名后上传。
 
-当前状态：已找到用户指定 p12，空密码无法打开，正等待导出密码；尚未导入 GitHub Secret，
-尚未执行此 macOS 签名工作流，下载页上的 Mac 包暂未替换。
+2026-11-10 已使用用户重新导出的 p12 完成签名。材料通过 GitHub 加密 Secret 注入，
+未写入源码；工作流 [42740685939](https://github.com/hwzlikewyh/iyw-claw-installer/actions/runs/42740685939)
+的签名和启动步骤全部成功，工作流源码提交为 `4230692776429650ff0a3063e4ca089f29913699`。
+
+签名身份：Developer ID Application: Xiamen Hongyue Product Design Co.,Ltd. (393H57RCN6)。
+证书有效期至 2027-02-02；Team ID 为 `393H57RCN6`。
+应用和 DMG 的 Developer ID、Apple Root CA 链、安全时间戳及 hardened runtime 标志均已验证；
+Intel/ARM64 两个 Mach-O 分片均包含嵌入式签名。下载后的 ZIP、DMG 摘要验证通过，
+已替换 v0.1.0 下载文件、同步本机 `dist/release-0.1.0/` 并更新汇总摘要和签名报告。
+
+macOS DMG SHA-256：
+`0f5377d7a29c626061862e29711a8e25a00ce6493457afe552dffca4419c3a99`。
+macOS ZIP SHA-256：
+`97092953d17471aa8fd5274e14a648b70b4f27cfbe9f9fabc190aa9619bef803`。
+
+未提供 Apple 公证账户凭据，本次公证状态为 `not-submitted`，不能声称 Gatekeeper 公证通过。
 
 官方流程依据：
 https://developer.apple.com/documentation/security/customizing-the-notarization-workflow
