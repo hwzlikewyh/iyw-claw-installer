@@ -1,0 +1,53 @@
+name: Sign macOS installer
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release containing the universal ZIP
+        required: true
+        default: v0.1.0
+        type: string
+      source_sha256:
+        description: Expected SHA-256 of the source universal ZIP
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: sign-macos-installer
+  cancel-in-progress: false
+jobs:
+  sign:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download exact release input
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          mkdir -p build-signing/input
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern YuanAssistant-Setup-macos-universal.zip --dir build-signing/input
+      - name: Sign and verify distribution
+        env:
+          SOURCE_SHA256: ${{ inputs.source_sha256 }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash scripts/import-macos-signing.sh
+      - name: Launch signed application
+        run: |
+          "build-signing/app/原助理安装向导.app/Contents/MacOS/原助理安装向导" &
+          app_pid=$!
+          sleep 5
+          kill -0 "$app_pid"
+          kill -TERM "$app_pid"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-signed
+          path: packages/*
+          if-no-files-found: error

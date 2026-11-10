@@ -69,8 +69,11 @@ Linux 使用 ldd 检查没有缺失动态库，并生成声明依赖的 DEB。
 每个平台会打开欢迎窗口做启动检查，Linux 在 Xvfb 中运行。
 这些检查不执行真实安装，也不能代替目标系统上的安装、升级、回退和环境补齐验收。
 
-Windows 向导未做发布证书签名。macOS 仅作 ad-hoc 签名，没有 Developer ID 签名及 Apple 公证；
+基础构建工作流产出未做发布证书签名的候选。v0.1.0 的 Windows 发布下载文件已另外完成
+正式 Authenticode 签名与 RFC 3161 时间戳验证，签名后重新打包并更新摘要。
+macOS 当前仍作 ad-hoc 签名，Developer ID 签名等待证书导出密码，尚无 Apple 公证；
 Gatekeeper 仍会将互联网下载的文件视为未经公证的应用。当前包应作为候选体验版。
+签名步骤和输入要求见 [签名说明](signing.md)。
 
 ## 一手构建资料
 

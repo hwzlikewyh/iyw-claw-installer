@@ -74,5 +74,7 @@ Linux 检查 glibc 2.35+、GTK 3、WebKitGTK 4.1；从签名 AppImage 解包运�
 
 源码与验证记录见 `docs/design.md`、`docs/verification.md`，最新截图为 `docs/final-*.png`。
 安装动效演示见 `docs/install-motion.gif`，使用隔离模拟进度录制，正式程序仍按实际进度运行。
-Windows 向导未做发布证书签名，macOS 仅作 ad-hoc 签名、未做 Apple 公证。
+v0.1.0 的 Windows 下载文件已完成正式 Authenticode 签名和 DigiCert 时间戳验证。
+macOS 下载文件目前仍为 ad-hoc 签名，正在等待提供证书导出密码以完成 Developer ID 签名。
 当前提供构建候选；依赖许可证随打包目录附带。
+签名流程与验证记录见 [签名说明](docs/signing.md)。

@@ -6,3 +6,7 @@
 /dist/
 /packages/
 __pycache__/
+*.p12
+*.pfx
+*.p8
+*-password.txt
