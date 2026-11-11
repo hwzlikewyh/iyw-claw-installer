@@ -1,6 +1,12 @@
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#include <uxtheme.h>
+#endif
 #include "window.h"
 #include "release.h"
 #include "logo_data.h"
+#include "diagnostics.h"
 #include <wx/dcbuffer.h>
 #include <wx/filename.h>
 #include <wx/icon.h>
@@ -50,11 +56,26 @@ void SetupWindow::CreateControls() {
     browse_->SetBackgroundColour(ui::Ground);
     primary_ = new ui::Button(canvas_, wxS("开始设置"), ui::ButtonStyle::Primary);
     secondary_ = new ui::Button(canvas_, wxS("退出"));
+    details_ = new ui::Button(canvas_, wxS("查看详情"));
+    logs_ = new ui::Button(canvas_, wxS("打开日志"));
+    copy_ = new ui::Button(canvas_, wxS("复制诊断信息"));
+    diagnosticText_ = new wxTextCtrl(canvas_, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+        wxTE_MULTILINE | wxTE_READONLY | wxTE_DONTWRAP | wxBORDER_NONE);
+    diagnosticText_->SetName(wxS("本次安装诊断详情，可滚动并选择文本"));
+    diagnosticText_->SetFont(ui::Font(FromDIP(12)));
+#ifdef _WIN32
+    SetWindowTheme(reinterpret_cast<HWND>(diagnosticText_->GetHandle()), L"", L"");
+#endif
+    diagnosticText_->SetBackgroundColour(ui::Ground); diagnosticText_->SetForegroundColour(ui::Ink);
+    diagnosticText_->Hide();
 }
 void SetupWindow::BindEvents() {
     primary_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OnPrimary(); });
     secondary_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OnSecondary(); });
     browse_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Browse(); });
+    details_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { ToggleDiagnostics(); });
+    logs_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OpenLog(); });
+    copy_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { CopyDiagnostics(); });
     const std::array<wxWindow*,4> motionControls{path_,browse_,primary_,secondary_};
     for(auto* control:motionControls)
         control->Bind(wxEVT_MOTION,[this](wxMouseEvent& event){WakeMotion();event.Skip();});
@@ -80,6 +101,10 @@ void SetupWindow::LayoutControls() {
     };
     place(path_, wxRect(536, 261, 247, 28));
     place(browse_, wxRect(800, 254, 98, 40));
+    place(details_, wxRect(520, 468, 116, 34));
+    place(logs_, wxRect(640, 468, 116, 34));
+    place(copy_, wxRect(760, 468, 144, 34));
+    place(diagnosticText_, wxRect(532, 252, 360, 196));
     place(primary_, welcome ? wxRect(520, 386, 384, 50) : wxRect(702, 519, 202, 48));
     place(secondary_, welcome ? wxRect(520, 448, 384, 34) : Running() ?
         wxRect(758, 519, 146, 48) : wxRect(520, 519, 158, 48));
@@ -112,6 +137,13 @@ void SetupWindow::Paint(wxPaintEvent&) {
 void SetupWindow::UpdateControls() {
     pageDirty_=true;
     const bool ready = snapshot_.phase == setup::Phase::Ready;
+    const bool failed = snapshot_.phase == setup::Phase::Failed;
+    details_->Show(failed); logs_->Show(failed); copy_->Show(failed);
+    logs_->Enable(failed && !snapshot_.logPath.empty());
+    if (!failed) diagnosticText_->Hide();
+    details_->SetLabel(diagnosticText_->IsShown() ? wxS("收起详情") : wxS("查看详情"));
+    logs_->SetLabel(wxS("打开日志"));
+    copy_->SetLabel(wxS("复制诊断信息"));
     path_->Show(ready && configuring_); browse_->Show(ready && configuring_);
     primary_->Show(!Running()); primary_->Enable(!Running());
     secondary_->Enable(!cancelling_ && (!Running() || snapshot_.cancellable));

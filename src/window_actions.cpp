@@ -1,5 +1,9 @@
 #include "window.h"
 #include "release.h"
+#include "diagnostics.h"
+#include <wx/clipbrd.h>
+#include <wx/dataobj.h>
+#include <wx/filename.h>
 #include <wx/dirdlg.h>
 #include <wx/msgdlg.h>
 #include <wx/utils.h>
@@ -13,6 +17,34 @@ void SetupWindow::Browse() {
     if (dialog.ShowModal() == wxID_OK) {
         path_->SetValue(dialog.GetPath()); path_->SetInsertionPoint(0);
     }
+}
+void SetupWindow::ToggleDiagnostics() {
+    const bool show = !diagnosticText_->IsShown();
+    if (show) {
+        diagnosticText_->SetBackgroundColour(ui::Ground);
+        diagnosticText_->SetForegroundColour(ui::Ink);
+        diagnosticText_->ChangeValue(ToText(setup::diagnostics::Report(snapshot_)));
+        diagnosticText_->SetInsertionPoint(0);
+    }
+    diagnosticText_->Show(show);
+    details_->SetLabel(show ? wxS("收起详情") : wxS("查看详情"));
+    if (show) diagnosticText_->SetFocus();
+    pageDirty_ = true; canvas_->Refresh();
+}
+void SetupWindow::OpenLog() {
+    const auto path = ToText(snapshot_.logPath.u8string());
+    if (wxFileExists(path) && wxLaunchDefaultApplication(path)) return;
+    logs_->SetLabel(wxS("日志不可用"));
+    if (!diagnosticText_->IsShown()) ToggleDiagnostics();
+}
+void SetupWindow::CopyDiagnostics() {
+    auto report = ToText(setup::diagnostics::Report(snapshot_));
+    try { report.Replace(ToText(setup::UserHome().u8string()), wxS("%USERPROFILE%")); }
+    catch (const std::exception&) { }
+    if (!wxTheClipboard->Open()) { copy_->SetLabel(wxS("复制失败，请重试")); return; }
+    const bool copied = wxTheClipboard->SetData(new wxTextDataObject(report));
+    wxTheClipboard->Flush(); wxTheClipboard->Close();
+    copy_->SetLabel(copied ? wxS("已复制诊断信息") : wxS("复制失败，请重试"));
 }
 void SetupWindow::StartInstall() {
     try {

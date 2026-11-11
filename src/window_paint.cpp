@@ -1,4 +1,5 @@
 #include "window.h"
+#include "diagnostics.h"
 #include <wx/brush.h>
 #include <wx/pen.h>
 namespace {constexpr double Left=520;constexpr double Right=904;}
@@ -62,10 +63,17 @@ void SetupWindow::PaintResult(wxGraphicsContext& g){
         wxString::FromUTF8(setup::StageName(snapshot_.stage)),{538,260},13,ui::Ink,true});
     ui::Text(g,{wxString::Format(wxS("已完成 %u / 8 步  ·  用时 %.1f 秒"),snapshot_.completedStages,snapshot_.elapsed),
         {538,293},11,ui::Muted});
-    auto reason=wxString::FromUTF8(snapshot_.detail);
+    auto reason=wxString::FromUTF8(success||cancelled?snapshot_.detail:setup::diagnostics::Reason(snapshot_));
+    reason.Replace("\r", " "); reason.Replace("\n", " ");
     if(reason.length()>81)reason=reason.Left(78)+wxS("…");
     for(std::size_t line=0;line<3&&line*27<reason.length();++line)
-        ui::Text(g,{reason.Mid(line*27,27),{538,329+line*24.0},12,colour});
+        ui::Text(g,{reason.Mid(line*27,27),{538,322+line*21.0},12,colour});
+    if (!success && !cancelled) {
+        const auto advice=wxString::FromUTF8(setup::diagnostics::Advice(snapshot_));
+        for(std::size_t line=0;line<3&&line*27<advice.length();++line)
+            ui::Text(g,{advice.Mid(line*27,27),{538,392+line*19.0},11,ui::Muted});
+        return;
+    }
     auto path=wxString::FromUTF8(snapshot_.destination.u8string());
     if(path.length()>45)path=path.Left(15)+wxS("…")+path.Right(28);
     ui::Text(g,{path,{538,425},10,ui::Muted});

@@ -1,4 +1,5 @@
 #include "release.h"
+#include "diagnostics.h"
 #include <fstream>
 #include <algorithm>
 #include <stdexcept>
@@ -23,10 +24,8 @@ void SaveFailure(const fs::path& directory, Snapshot& result) {
     const auto path = directory / "installer-error.log";
     std::ofstream log(path, std::ios::binary);
     if (!log) return;
-    log << "原助理安装向导\n";
-    for (const auto& event : result.events) log << event << '\n';
-    log << result.detail << '\n';
-    if (result.logPath.empty()) result.logPath = path;
+    result.logPath = path;
+    log << diagnostics::Report(result);
 }
 void Execute(FileWork& work) {
     BeginStage(work, Phase::Checking);
@@ -86,6 +85,7 @@ void InstallJob::Run(fs::path root) {
         }
         result.phase = IsCancelled() && result.cancellable ? Phase::Cancelled : Phase::Failed;
         result.detail = result.phase == Phase::Cancelled ? "下载或校验已取消，尚未启动安装。" : error.what();
+        result.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
         result.events.push_back(result.detail); SaveFailure(work.staging, result);
     }
     if(!work.staging.empty()){
@@ -97,6 +97,7 @@ void InstallJob::Run(fs::path root) {
                     fs::copy_file(entry.path(),logs/entry.path().filename(),fs::copy_options::overwrite_existing);
             }
             if(!result.logPath.empty()&&result.logPath.parent_path()==work.staging)result.logPath=logs/result.logPath.filename();
+            if(result.phase==Phase::Failed||result.phase==Phase::Cancelled)SaveFailure(logs,result);
         }catch(const std::exception&){result.events.push_back("安装日志暂留下载缓存目录。");}
     }
     work.packageLock.reset();

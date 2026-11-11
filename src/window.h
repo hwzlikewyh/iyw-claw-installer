@@ -43,6 +43,9 @@ private:
     void CloseWindow(wxCloseEvent& event);
     void Browse();
     void UpdateControls();
+    void ToggleDiagnostics();
+    void OpenLog();
+    void CopyDiagnostics();
     bool Running() const;
     double Width() const;
     double Height() const;
@@ -52,6 +55,10 @@ private:
     ui::Button* browse_ = nullptr;
     ui::Button* primary_ = nullptr;
     ui::Button* secondary_ = nullptr;
+    ui::Button* details_ = nullptr;
+    ui::Button* logs_ = nullptr;
+    ui::Button* copy_ = nullptr;
+    wxTextCtrl* diagnosticText_ = nullptr;
     ui::Button* close_ = nullptr;
     ui::Button* minimize_ = nullptr;
     wxBitmap logo_;
