@@ -19,7 +19,9 @@ WMF x64 SHA-256 `c51abfc65dff5f6858c0b9f6420caa0c166df7a6d8b484f8a3c68ea99f0032b
 WMF x86 SHA-256 `4575c47bedf732c7c215a5dd9e184ac2f06f10c0f23fcef38eec96b0ff3bd121`，
 .NET 4.6.2 SHA-256 `b4cbb4bc9a3983ec3be9f80447e0d619d15256a9ce66ff414ae6e3856705e237`；
 .NET 与 WMF 包的 Microsoft 发布者签名验证通过。本机不是 Win7，未在 Win7 上实际运行安装或重启验收。
-安装向导未签名、未发布，用户截图系统仍需使用发布后的新版程序才会获得修复。
+提交 `853bbcd84bb25c533523113ca2ecdccd7bedb51c` 对应的 Windows 包已完成 Authenticode 签名、
+发布者、时间戳、ZIP 内 EXE 及许可证验证，候选摘要见 [签名说明](signing.md)。v0.1.0 预发布附件
+已更新并下载回验；Win7 实机安装/重启验收和 ai.iyw.cn 下载页数据源切换仍未完成。
 
 日期：2026-11-09。环境：Windows 11 x64，12 个逻辑处理器，100% 显示缩放。
 当前交付为真实在线安装向导，已接入 Fusion 稳定版和预置环境；早期 Demo 的测量不代表当前版本。

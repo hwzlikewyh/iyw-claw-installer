@@ -20,9 +20,20 @@
 - 已替换 v0.1.0 的 EXE、ZIP 和汇总 SHA256SUMS.txt。
 
 Windows EXE SHA-256：
-`0c9dffa6bc5b27947f3accb7d1d4a02fe7d883ade964dde942cb0b4a4bbb76f2`。
+`9586f7327845a0335a84af0291631ca380098e71a948da315e76ee89fa67927f`。
 Windows ZIP SHA-256：
-`484ebd4fdae1fbd979267c5a966b3cb1b5da510a091e9e4f638ae3031d6f1835`。
+`a6fbccb5a1766271bf340b518c2e9579df73beef0e94d7038db77990eb2da0bb`。
+
+### Windows 7 前置组件修复候选（2026-11-12）
+
+来自 iyw-claw-installer main 提交 `853bbcd84bb25c533523113ca2ecdccd7bedb51c` 的
+Win32 Release 程序通过相同 Authenticode 身份签名；发布者、证书指纹与 DigiCert 时间戳验证通过。
+签名候选复用了现有 v0.1.0 文件名，并已替换该预发布页中的 Windows EXE、ZIP 和摘要清单。
+下载后已核对发布者、时间戳、整包 SHA-256 和 ZIP 内 EXE 一致性。
+
+- EXE SHA-256：`9586f7327845a0335a84af0291631ca380098e71a948da315e76ee89fa67927f`
+- ZIP SHA-256：`a6fbccb5a1766271bf340b518c2e9579df73beef0e94d7038db77990eb2da0bb`
+- ZIP 中 EXE 的 SHA-256 与独立签名 EXE 一致；随包许可证文件保留。
 
 ### SmartScreen 提示核查
 

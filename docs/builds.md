@@ -4,6 +4,12 @@
 构建入口：GitHub Actions → Build installers → Run workflow。
 推送 main 分支中的源码、资源或构建脚本变更也会启动构建。
 
+2026-11-12，Windows PowerShell 前置组件修复已推送 main，三端 GitHub Actions 原生构建全部通过：
+[Actions 43198131723](https://github.com/hwzlikewyh/iyw-claw-installer/actions/runs/43198131723)，
+源码提交 `853bbcd84bb25c533523113ca2ecdccd7bedb51c`。Windows EXE 已用正式证书重新签名，
+ZIP 内程序、摘要、发布者、时间戳和许可证核验通过，并已替换 v0.1.0 预发布页中的 Windows
+EXE、ZIP 和汇总清单。Win7 实机安装验收仍未完成；ai.iyw.cn 下载页的数据源仍待单独切换。
+
 2026-11-10，四项原生构建和启动检查全部通过：
 [Actions 42726267427](https://github.com/hwzlikewyh/iyw-claw-installer/actions/runs/42726267427)。
 构建源码提交为 `3dd55ac18f21e2d1adc3b769d44c53861a2886de`。

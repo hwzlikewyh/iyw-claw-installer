@@ -25,4 +25,9 @@ macOS 应用与 DMG 已用 Xiamen Hongyue Product Design Co.,Ltd. 的 Developer 
 Windows 新程序即使签名有效，也可能显示 SmartScreen“无法识别的应用”提醒。
 这项检查还依据文件和发布者信誉；签名不会立即建立下载信誉。请确认下载来源与发行者后操作。
 
+2026-11-12，Windows 统一安装程序已补齐 Win7 PowerShell 5.1 / .NET 前置检查及微软官方组件修复。
+v0.1.0 预发布页 Windows EXE、带许可证 ZIP 和 SHA256SUMS 已用同一正式签名身份重新签名、
+替换并从 Release 下载回验。新 EXE SHA-256：
+`9586f7327845a0335a84af0291631ca380098e71a948da315e76ee89fa67927f`。
+
 本版不改变 Fusion 当前 stable 选择策略，安装向导版本与应用版本独立。
