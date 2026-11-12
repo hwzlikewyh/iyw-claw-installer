@@ -10,6 +10,8 @@ using Handle = std::unique_ptr<void, HandleClose>;
 Handle OpenLocked(const fs::path& path);
 std::string FileVersion(const fs::path& path);
 void VerifySignature(const fs::path& path);
+void VerifyMicrosoftSignature(const fs::path& path);
 void VerifyHash(const Release& release, FileWork& work);
+void CheckWindowsPowerShell(const Platform& platform, FileWork& work);
 }
 #endif

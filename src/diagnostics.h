@@ -16,6 +16,7 @@ inline std::string Lower(std::string text) {
 inline const std::array<const char*, 3>* Match(const std::string& detail) {
     static const std::array<const char*, 3> rules[] = {
         {"symbolic link or junction", "后台进程的目录链接未通过安装器检查。", "重启电脑后先不要打开原助理，再重试；若仍失败，请复制诊断信息反馈。"},
+        {"需要重启后才能继续", "Windows 已准备好所需系统组件。", "重启电脑后重新运行安装程序，即可继续安装原助理。"},
         {"process control failed", "检查或关闭后台进程失败。", "退出原助理及相关任务后重试；仍失败时重启电脑，并复制诊断信息反馈。"},
         {"后台进程", "检查或关闭后台进程失败。", "退出原助理及相关任务后重试；仍失败时重启电脑，并复制诊断信息反馈。"},
         {"退出码：1223", "本次管理员授权已取消。", "重新安装时允许系统的管理员授权请求。"},

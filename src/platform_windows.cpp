@@ -2,10 +2,10 @@
 #include "command.h"
 #ifdef _WIN32
 #include <shlobj.h>
-#include <winternl.h>
 #include <array>
 #include <stdexcept>
 #include <vector>
+#include "win7_prerequisites.inc"
 namespace setup {
 Platform CurrentPlatform() {
     using GetVersion = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
@@ -58,13 +58,7 @@ bool ReuseApplication(const Release& release,FileWork& work){
 void CheckSystem(FileWork& work){
     const auto platform=CurrentPlatform();
     work.progress.checks.push_back("系统："+platform.target+" / "+platform.arch);
-    wchar_t system[MAX_PATH]{};GetSystemDirectoryW(system,MAX_PATH);
-    const auto powershell=fs::path(system)/"WindowsPowerShell/v1.0/powershell.exe";
-    if(!fs::is_regular_file(powershell))throw std::runtime_error("缺少 Windows PowerShell，无法运行正式安装事务。");
-    const auto code=RunCommand({powershell,{"-NoProfile","-NonInteractive","-Command",
-        "if ($PSVersionTable.PSVersion -ge [version]'5.1') { exit 0 } else { exit 1 }"},work.staging/"powershell-check.log",20});
-    if(code!=0)throw std::runtime_error("此系统需要 PowerShell 5.1；Windows 7 请先安装 WMF 5.1 及其 .NET 前置组件。");
-    work.progress.checks.push_back("PowerShell 5.1：检查通过。");
+    CheckWindowsPowerShell(platform,work);
     work.progress.checks.push_back(platform.target=="windows7"?"WebView2：使用 Win7 安装包内固定 109 运行库。":
         "WebView2：由正式安装器检测，缺失时安装微软运行库。");
     work.job.Publish(work.progress);

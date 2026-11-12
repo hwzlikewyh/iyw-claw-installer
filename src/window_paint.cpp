@@ -46,17 +46,27 @@ wxString SetupWindow::PhaseTitle()const{
     switch(snapshot_.phase){
     case setup::Phase::Complete:return wxS("一切就绪，开始使用。");
     case setup::Phase::Cancelled:return wxS("已取消本次安装");
-    case setup::Phase::Failed:return wxS("安装需要处理一下");
+    case setup::Phase::Failed:
+        if(setup::diagnostics::Lower(snapshot_.detail).find("需要重启")!=std::string::npos)
+            return wxS("重启电脑后即可继续。");
+        return wxS("安装需要处理一下");
     default:return wxS("准备安装");}
 }
 void SetupWindow::PaintResult(wxGraphicsContext& g){
     const bool success=snapshot_.phase==setup::Phase::Complete;
     const bool cancelled=snapshot_.phase==setup::Phase::Cancelled;
-    const auto colour=success?ui::Success:cancelled?ui::Muted:ui::Danger;
-    ui::Text(g,{success?wxS("安装完成"):cancelled?wxS("已取消"):wxS("暂时未完成"),{Left,111},12,colour,true});
+    const bool restart=setup::diagnostics::Lower(snapshot_.detail).find("需要重启")!=std::string::npos;
+    const auto colour=success?ui::Success:cancelled?ui::Muted:
+        restart?ui::Accent:ui::Danger;
+    const auto status = restart ? wxString(wxS("需要重启")) :
+        success ? wxString(wxS("安装完成")) :
+        cancelled ? wxString(wxS("已取消")) : wxString(wxS("暂未完成"));
+    ui::Text(g,{status,{Left,111},12,colour,true});
     ui::Text(g,{PhaseTitle(),{Left,147},26,ui::Ink,true});
     const auto subtitle=success?wxS("原助理已经准备好，开始你的下一件事。"):
-        cancelled?wxS("下载已停止，可以稍后重新开始。 "):wxS("查看下面的原因，然后返回设置重试。");
+        cancelled?wxS("下载已停止，可以稍后重新开始。 "):
+        restart?wxS("系统组件已准备好，重启电脑后再次运行即可继续。"):
+        wxS("查看下面的原因，然后返回设置重试。");
     ui::Text(g,{subtitle,{Left,195},12,ui::Muted});
     ui::Rounded(g,{Left,242,Right-Left,218},ui::Ground);
     ui::Text(g,{success?wxS("原助理 ")+wxString::FromUTF8(snapshot_.version)+wxS(" · 稳定版"):

@@ -60,7 +60,9 @@ std::string HashFile(const fs::path& path){
     unsigned char digest[32]{};CheckCrypto(BCryptFinishHash(hash.value,digest,sizeof(digest),0));
     std::ostringstream text;for(auto byte:digest)text<<std::hex<<std::setfill('0')<<std::setw(2)<<static_cast<unsigned>(byte);return text.str();
 }
-void VerifySignature(const fs::path& path) {
+namespace {
+void VerifyPublisher(const fs::path& path, const wchar_t* publisher,
+    const char* mismatch) {
     WINTRUST_FILE_INFO file{}; file.cbStruct = sizeof(file); file.pcwszFilePath = path.c_str();
     WINTRUST_DATA trust{}; trust.cbStruct = sizeof(trust); trust.dwUIChoice = WTD_UI_NONE;
     trust.dwUnionChoice = WTD_CHOICE_FILE; trust.pFile = &file; trust.dwStateAction = WTD_STATEACTION_VERIFY;
@@ -75,12 +77,19 @@ void VerifySignature(const fs::path& path) {
         if (signer && signer->csCertChain) {
             wchar_t name[256]{};
             CertGetNameStringW(signer->pasCertChain[0].pCert, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, name, 256);
-            publisherMatches = std::wstring(name) == L"厦门市虹约产品设计有限公司";
+            publisherMatches = std::wstring(name) == publisher;
         }
     }
     trust.dwStateAction = WTD_STATEACTION_CLOSE; WinVerifyTrust(nullptr, &action, &trust);
     if (result != ERROR_SUCCESS) throw std::runtime_error("安装包数字签名校验失败。系统错误：" + std::to_string(result));
-    if (!publisherMatches) throw std::runtime_error("安装包签名发布者与原助理不匹配。");
+    if (!publisherMatches) throw std::runtime_error(mismatch);
+}
+}
+void VerifySignature(const fs::path& path) {
+    VerifyPublisher(path, L"厦门市虹约产品设计有限公司", "安装包签名发布者与原助理不匹配。");
+}
+void VerifyMicrosoftSignature(const fs::path& path) {
+    VerifyPublisher(path, L"Microsoft Corporation", "系统组件签名发布者不是 Microsoft。");
 }
 void VerifyDownload(const Release& release, FileWork& work) {
     BeginStage(work, Phase::Verifying);

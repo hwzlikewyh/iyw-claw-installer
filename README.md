@@ -55,7 +55,9 @@ Windows：Visual Studio C++ Build Tools、CMake、wxWidgets 3.2 源码。
 ```
 
 默认构建 Win32 统一入口；`-Architecture x64` 可构建专用 x64 入口。
-已检测 Windows 7 SP1 的 TLS 1.2、PowerShell 5.1 前置条件；WebView2 由正式安装包处理。
+已检测 Windows 7 SP1 的 TLS 1.2；缺少 PowerShell 5.1 或其 .NET 前置组件时，
+安装向导会下载微软官方签名包，校验后按本机架构补齐。系统要求重启时会暂停，
+重启后重新运行向导即可继续。WebView2 由正式安装包处理。
 Win7/ARM64/32 位系统仍需实机验收，缺少精确平台制品时明确失败，不退回其他系统的包。
 
 macOS/Linux：开发机准备 CMake、C++17、pkg-config、libcurl、libarchive、libsodium、

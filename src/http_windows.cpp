@@ -29,7 +29,8 @@ Address ParseURL(const std::wstring& url) {
     const std::wstring tosSuffix = L".volces.com";
     const bool tos = host.size() > tosSuffix.size() && host.compare(host.size() - tosSuffix.size(), tosSuffix.size(), tosSuffix) == 0 &&
         host.find(L".tos-") != std::wstring::npos;
-    if (host != L"gateway.iyw.cn" && host != L"vol-ai.iywtu.com" && !tos)
+    if (host != L"gateway.iyw.cn" && host != L"vol-ai.iywtu.com" &&
+        host != L"download.microsoft.com" && host != L"download.visualstudio.microsoft.com" && !tos)
         throw std::runtime_error("Fusion 返回了未授权的下载域名。");
     return result;
 }
