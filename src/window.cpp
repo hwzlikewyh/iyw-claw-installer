@@ -15,14 +15,16 @@
 #include <wx/utils.h>
 #include <memory>
 #include <array>
+#include <utility>
 
 namespace {
 constexpr int InitialWidth = 960;
 constexpr int InitialHeight = 640;
 }
-SetupWindow::SetupWindow()
+SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request)
     : wxFrame(nullptr, wxID_ANY, wxS("原助理 · 安装向导"), wxDefaultPosition, wxDefaultSize,
-        wxBORDER_NONE | wxSYSTEM_MENU | wxMINIMIZE_BOX), timer_(this), animation_(this) {
+        wxBORDER_NONE | wxSYSTEM_MENU | wxMINIMIZE_BOX), timer_(this), animation_(this),
+        updateRequest_(std::move(request)) {
     SetClientSize(FromDIP(wxSize(InitialWidth, InitialHeight)));
     canvas_ = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     canvas_->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -42,9 +44,14 @@ SetupWindow::SetupWindow()
     BindEvents();
     BindChrome();
     LayoutControls();
+    if (updateRequest_) path_->SetValue(wxString::FromUTF8(updateRequest_->destination.u8string()));
     path_->SetInsertionPoint(0);
     Centre(); primary_->SetFocus();
     StartMotion();
+    if (updateRequest_) {
+        configuring_ = true;
+        CallAfter([this] { StartInstall(); });
+    }
 }
 void SetupWindow::CreateControls() {
     path_ = new wxTextCtrl(canvas_, wxID_ANY, wxString::FromUTF8(setup::DefaultInstallRoot().u8string()),

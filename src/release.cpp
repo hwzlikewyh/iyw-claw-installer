@@ -24,6 +24,10 @@ bool DownloadURL(const std::string& value) {
     const auto id = value.substr(prefix.size(), value.size() - prefix.size() - 9);
     return !id.empty() && std::all_of(id.begin(), id.end(), [](unsigned char c) { return std::isdigit(c); });
 }
+bool ValidDigest(const std::string& value) {
+    return value.size() == 64 && std::all_of(value.begin(), value.end(),
+        [](unsigned char c) { return std::isxdigit(c); });
+}
 }
 Release ParseRelease(const std::string& body) {
     try {
@@ -48,6 +52,16 @@ Release ParseRelease(const std::string& body) {
     } catch (const nlohmann::json::exception&) {
         throw std::runtime_error("Fusion 版本响应格式异常，请稍后重试。");
     }
+}
+bool ValidateRequestedRelease(const Release& release, std::string& error) {
+    try { Version(release.version); }
+    catch (const std::exception& exception) { error = exception.what(); return false; }
+    if (!DownloadURL(release.url) || !ValidDigest(release.sha256) || release.size == 0 ||
+        release.size > 4ULL * 1024 * MiB) {
+        error = "更新包的版本、下载地址、大小或摘要无效。";
+        return false;
+    }
+    return true;
 }
 Release ResolveRelease(const Platform& platform, InstallJob& job) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();

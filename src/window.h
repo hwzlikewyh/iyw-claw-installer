@@ -6,10 +6,11 @@
 #include <wx/textctrl.h>
 #include <wx/timer.h>
 #include <chrono>
+#include <optional>
 
 class SetupWindow : public wxFrame {
 public:
-    SetupWindow();
+    explicit SetupWindow(std::optional<setup::UpdateRequest> request = std::nullopt);
 private:
     void Paint(wxPaintEvent& event);
     void PaintShell(wxGraphicsContext& graphics);
@@ -92,4 +93,5 @@ private:
     double visibleProgress_ = 0;
     double transition_ = 1;
     bool animationsEnabled_ = true;
+    std::optional<setup::UpdateRequest> updateRequest_;
 };

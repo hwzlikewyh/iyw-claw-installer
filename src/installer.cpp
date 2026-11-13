@@ -3,6 +3,7 @@
 #include <fstream>
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
@@ -27,13 +28,13 @@ void SaveFailure(const fs::path& directory, Snapshot& result) {
     result.logPath = path;
     log << diagnostics::Report(result);
 }
-void Execute(FileWork& work) {
+void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     BeginStage(work, Phase::Checking);
     ValidateRoot(work.progress.destination, work.progress);
     const auto platform = CurrentPlatform();
     CheckSystem(work); CheckEnvironment(work);
     BeginStage(work, Phase::Resolving);
-    const auto release = ResolveRelease(platform, work.job);
+    const auto release = request ? request->release : ResolveRelease(platform, work.job);
     {std::ofstream identity(work.staging/"selected-release.txt",std::ios::binary);
         identity<<release.version<<'\n'<<release.sha256<<'\n';}
     work.progress.version = release.version;
@@ -48,7 +49,19 @@ void Execute(FileWork& work) {
         throw std::runtime_error("临时下载目录空间不足。");
     const bool reused=ReuseApplication(release,work);
     if(reused){work.progress.reused[2]=true;work.progress.reused[3]=true;work.progress.reused[5]=true;}
-    if(!reused){DownloadPackage(release,work);VerifyDownload(release,work);}
+    if(!reused){
+        if (request && !request->packageCache.empty()) {
+            BeginStage(work, Phase::Downloading);
+            work.progress.phaseTotal = release.size;
+            work.progress.detail = "正在复用已校验的更新缓存";
+            fs::copy_file(request->packageCache, work.staging / "setup.exe",
+                fs::copy_options::overwrite_existing);
+            VerifyDownload(release, work);
+            work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Downloading))] = true;
+        } else {
+            DownloadPackage(release,work);VerifyDownload(release,work);
+        }
+    }
     PrefetchEnvironment(work);
     if(!reused)InstallPackage(release,work);
     PrepareEnvironment(release, work); VerifyInstalled(release, work);
@@ -68,17 +81,24 @@ void InstallJob::Publish(Snapshot value) { std::lock_guard<std::mutex> guard(mut
 void InstallJob::Start(const fs::path& root) {
     Join(); cancelled_.store(false); Snapshot initial; initial.phase = Phase::Checking; initial.destination = root;
     Publish(initial);
-    try { worker_ = std::thread(&InstallJob::Run, this, root); }
+    try { worker_ = std::thread(&InstallJob::Run, this, root, std::nullopt); }
     catch (const std::exception& error) { initial.phase = Phase::Failed; initial.detail = error.what(); Publish(initial); }
 }
-void InstallJob::Run(fs::path root) {
+void InstallJob::Start(UpdateRequest request) {
+    Join(); cancelled_.store(false); Snapshot initial; initial.phase = Phase::Checking; initial.destination = request.destination;
+    initial.version = request.release.version;
+    Publish(initial);
+    try { worker_ = std::thread(&InstallJob::Run, this, request.destination, std::optional<UpdateRequest>(std::move(request))); }
+    catch (const std::exception& error) { initial.phase = Phase::Failed; initial.detail = error.what(); Publish(initial); }
+}
+void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
 #ifdef _WIN32
     SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
 #endif
     Snapshot result; result.destination = std::move(root);
     FileWork work{*this, {}, result, std::chrono::steady_clock::now(), {}};
     try {
-        work.staging = CreateStaging(); Execute(work);
+        work.staging = CreateStaging(); Execute(work, request);
     } catch (const std::exception& error) {
         try { FinishDeployment(work, false); } catch (const std::exception& rollback) {
             result.events.push_back(std::string("应用恢复失败，保留现场：") + rollback.what());

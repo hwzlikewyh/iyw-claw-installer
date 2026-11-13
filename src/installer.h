@@ -6,6 +6,7 @@
 #include <mutex>
 #include <memory>
 #include <map>
+#include <optional>
 #include <array>
 #include <string>
 #include <thread>
@@ -24,6 +25,11 @@ struct Release {
     std::string sha256;
     std::uint64_t size = 0;
     std::string signature;
+};
+struct UpdateRequest {
+    fs::path destination;
+    fs::path packageCache;
+    Release release;
 };
 struct PresetComponent{
     std::string id,version,versionId,artifactId,sha256;
@@ -56,13 +62,14 @@ class InstallJob {
 public:
     ~InstallJob();
     void Start(const fs::path& parent);
+    void Start(UpdateRequest request);
     void Cancel();
     void Join();
     Snapshot Read() const;
     bool IsCancelled() const;
     void Publish(Snapshot value);
 private:
-    void Run(fs::path parent);
+    void Run(fs::path parent, std::optional<UpdateRequest> request = std::nullopt);
     mutable std::mutex mutex_;
     Snapshot state_;
     std::atomic<bool> cancelled_{false};

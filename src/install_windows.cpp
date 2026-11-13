@@ -131,6 +131,7 @@ void VerifyInstalled(const Release& release, FileWork& work) {
     if (FileVersion(executable) != release.version)
         throw std::runtime_error("安装后的版本与 Fusion 稳定版不一致，已停止启动。");
     if(work.retainedFiles.size()!=2){VerifySignature(executable);VerifySignature(helper);}
+    InstallUnifiedInstaller(work.progress.destination);
     work.progress.executable = executable;
     work.progress.detail = "原助理 " + release.version + " 已安装，点击下方按钮启动。";
 }

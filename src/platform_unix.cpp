@@ -15,6 +15,7 @@
 #endif
 extern char** environ;
 namespace setup {
+void InstallUnifiedInstaller(const fs::path&) {}
 fs::path UserHome(){
     struct passwd user{},*result=nullptr;std::vector<char> buffer(16384);
     if(getpwuid_r(getuid(),&user,buffer.data(),buffer.size(),&result)||!result||!user.pw_dir)

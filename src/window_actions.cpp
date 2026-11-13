@@ -7,6 +7,7 @@
 #include <wx/dirdlg.h>
 #include <wx/msgdlg.h>
 #include <wx/utils.h>
+#include <utility>
 
 namespace {
 constexpr int ProgressRefreshMs = 100;
@@ -56,7 +57,14 @@ void SetupWindow::StartInstall() {
         inlineMessage_.clear();closing_=false;
         started_ = std::chrono::steady_clock::now(); liveSeconds_ = 0; cancelling_ = false;
         tipStartedSeconds_ = motionSeconds_;
-        job_.Start(folder); snapshot_ = job_.Read(); UpdateControls();
+        if (updateRequest_) {
+            updateRequest_->destination = folder;
+            job_.Start(std::move(*updateRequest_));
+            updateRequest_.reset();
+        } else {
+            job_.Start(folder);
+        }
+        snapshot_ = job_.Read(); UpdateControls();
         WakeMotion();
         timer_.Start(ProgressRefreshMs);
     } catch (const std::exception& error) {

@@ -41,6 +41,24 @@ fs::path UserHome(){
         throw std::runtime_error("无法读取当前用户目录。");return fs::path(path);
 }
 fs::path EnvironmentHelper(const fs::path& root){return root/"app/iyw-environment.exe";}
+void InstallUnifiedInstaller(const fs::path& root) {
+    wchar_t buffer[32768]{};
+    constexpr DWORD capacity = static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0]));
+    const auto length = GetModuleFileNameW(nullptr, buffer, capacity);
+    if (!length || length >= capacity) throw std::runtime_error("无法定位统一安装向导自身。");
+    const fs::path source(buffer, buffer + length);
+    const fs::path destination = root / "installer" / "原助理安装向导.exe";
+    std::error_code equivalentError;
+    if (fs::equivalent(source, destination, equivalentError) && !equivalentError) return;
+    VerifySignature(source);
+    fs::create_directories(destination.parent_path());
+    const fs::path temporary = destination.string() + ".new";
+    fs::copy_file(source, temporary, fs::copy_options::overwrite_existing);
+    if (!MoveFileExW(temporary.c_str(), destination.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        fs::remove(temporary);
+        throw std::runtime_error("无法保存统一安装向导。");
+    }
+}
 void VerifyEnvironmentBinary(const fs::path& helper){VerifySignature(helper);}
 bool ReuseApplication(const Release& release,FileWork& work){
     const auto executable=work.progress.destination/"app/iyw-claw.exe";
