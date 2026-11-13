@@ -44,7 +44,7 @@ def notices(destination):
     (destination / "使用说明.txt").write_text(
         "原助理在线安装向导\n\n运行向导后选择安装位置，按实际进度下载最新稳定版和预置环境。\n"
         "安装完成后点击“启动原助理”。已安装且健康的组件会复用。\n"
-        "本包是未经过发布证书签名/公证的构建候选，不等同于所有系统的实机验收。\n"
+        "Windows 发布包的签名状态以发布页 SHA256SUMS 和系统签名验证为准。\n"
         "Windows: Win7 SP1/10/11；Win7 需 TLS 1.2 和 PowerShell 5.1。\n"
         "macOS: 13.5+，Intel/Apple Silicon 通用包；首次打开受 Gatekeeper 管理。\n"
         "Linux: Ubuntu 22.04+ / Debian 12+；DEB 自动声明 GTK/curl/archive/sodium/WebKitGTK 依赖。\n"
