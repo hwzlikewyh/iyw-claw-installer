@@ -1,4 +1,5 @@
 #include "window.h"
+#include "release.h"
 #include <wx/app.h>
 #include <wx/image.h>
 #include <wx/msgdlg.h>
