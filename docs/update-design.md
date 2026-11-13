@@ -198,10 +198,10 @@ Claw 索引存在新增文件及版本差异，具体实现判断以本轮读取
 
 本次代码实现先覆盖 Windows x64；macOS/Linux 保留当前原生更新器，待对应平台的统一向导制品和交接参数准备后再接入。
 
-- `iyw-claw-installer`：`8333ea0`，统一向导接收固定版本、安装目录和已验证 NSIS 缓存，
+- `iyw-claw-installer`：`b236aaa`（包含 `8333ea0`），统一向导接收固定版本、安装目录和已验证 NSIS 缓存，
   首次成功安装后把签名向导复制到安装根目录；更新不重复下载主包。
-- `iyw-claw`：`13190763`，Windows 应用更新优先启动安装根目录向导；向导缺失或 handoff 失败时保留 Tauri 原更新器。
-- `iyw-fusion-api`：`db9ab6a`，Tauri manifest 保持原 NSIS，同时附带同一 release 的 bootstrapper 元数据；旧客户端忽略新增字段。
+- `iyw-claw`：`f370cda`（包含 `13190763`），Windows 应用更新优先启动安装根目录向导；向导缺失或 handoff 失败时保留 Tauri 原更新器。
+- `iyw-fusion-api`：`4ad19c5`（包含 `db9ab6a`），Tauri manifest 保持原 NSIS，同时附带同一 release 的 bootstrapper 元数据；旧客户端忽略新增字段，bootstrapper 查询失败时保留 NSIS 更新。
 
 Fusion 定向 Go 测试已通过。Claw 按仓库门禁未在本机编译或测试桌面端；安装器本机没有 wxWidgets/C++
 构建环境，未生成安装向导。后续实施以“本轮步骤与验收方式”为准，不默认实施 v2、数据库或退役扩展。
