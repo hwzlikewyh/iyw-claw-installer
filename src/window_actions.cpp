@@ -59,8 +59,7 @@ void SetupWindow::StartInstall() {
         tipStartedSeconds_ = motionSeconds_;
         if (updateRequest_) {
             updateRequest_->destination = folder;
-            job_.Start(std::move(*updateRequest_));
-            updateRequest_.reset();
+            job_.Start(*updateRequest_);
         } else {
             job_.Start(folder);
         }
@@ -102,6 +101,16 @@ void SetupWindow::Tick(wxTimerEvent&) {
     if (!Running()) {
         timer_.Stop(); job_.Join(); cancelling_ = false;
         if (closing_) { Destroy(); return; }
+        if (updateMode_ && snapshot_.phase == setup::Phase::Complete) {
+            try { setup::LaunchInstalled(snapshot_, true); Destroy(); return; }
+            catch (const std::exception& error) {
+                inlineMessage_ = ToText(error.what());
+                Show();
+            }
+        } else if (silentUpdate_) {
+            Destroy();
+            return;
+        }
         BeginTransition(); UpdateControls(); primary_->SetFocus();
     }
     canvas_->Refresh(false);

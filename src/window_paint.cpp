@@ -36,9 +36,15 @@ void SetupWindow::PaintConfigure(wxGraphicsContext& g){
     g.SetPen(wxPen(wxColour("#3e424e"),1));g.StrokeLine(793,263,793,285);
     ui::Text(g,{wxS("沿用已有目录，可升级、重装或回退。"),{Left,313},11,ui::Muted});
     g.SetPen(wxPen(ui::Line,1));g.StrokeLine(Left,353,Right,353);
-    ui::Text(g,{wxS("最新稳定版"),{Left,373},14,ui::Ink,true});
-    ui::Text(g,{wxS("每次从 Fusion 实时获取匹配的安装包。"),{Left,402},12,ui::Muted});
-    ui::Text(g,{wxS("下载校验后，由正式安装器完成环境配置。"),{Left,429},12,ui::Muted});
+    if (configuring_ && updateRequest_) {
+        ui::Text(g,{wxS("正在更新原助理"),{Left,373},14,ui::Ink,true});
+        ui::Text(g,{wxString::Format(wxS("目标版本 %s  ·  %s 通道"),wxString::FromUTF8(updateRequest_->release.version),wxString::FromUTF8(updateRequest_->channel)),{Left,402},12,ui::Muted});
+        ui::Text(g,{wxS("复用已校验更新包；环境按组件核对，只补齐缺项。"),{Left,429},12,ui::Muted});
+    } else {
+        ui::Text(g,{wxS("最新稳定版"),{Left,373},14,ui::Ink,true});
+        ui::Text(g,{wxS("每次从 Fusion 实时获取匹配的安装包。"),{Left,402},12,ui::Muted});
+        ui::Text(g,{wxS("下载校验后，由正式安装器完成环境配置。"),{Left,429},12,ui::Muted});
+    }
     ui::Text(g,{wxS("建议预留至少 2 GiB 可用空间。"),{Left,469},11,ui::Muted});
 }
 wxString SetupWindow::PhaseTitle()const{

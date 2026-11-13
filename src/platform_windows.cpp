@@ -1,8 +1,10 @@
 #include "windows_support.h"
 #include "command.h"
 #ifdef _WIN32
+#include <shellapi.h>
 #include <shlobj.h>
 #include <array>
+#include <fstream>
 #include <stdexcept>
 #include <vector>
 #include "win7_prerequisites.inc"
@@ -41,6 +43,23 @@ fs::path UserHome(){
         throw std::runtime_error("无法读取当前用户目录。");return fs::path(path);
 }
 fs::path EnvironmentHelper(const fs::path& root){return root/"app/iyw-environment.exe";}
+void LaunchExistingForUpdate(const fs::path& root) {
+    if (root.empty() || !root.is_absolute() || root == root.root_path()) return;
+    const auto executable = root / "app" / "iyw-claw.exe";
+    if (!fs::is_regular_file(executable)) return;
+    VerifySignature(executable);
+    SHELLEXECUTEINFOW launch{};
+    launch.cbSize = sizeof(launch);
+    launch.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    launch.lpVerb = L"open";
+    launch.lpFile = executable.c_str();
+    launch.lpParameters = L"--restore-installer-session";
+    const auto directory = root / "app";
+    launch.lpDirectory = directory.c_str();
+    launch.nShow = SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&launch))
+        throw std::runtime_error("无法重新启动旧版本。系统错误：" + std::to_string(GetLastError()));
+}
 void InstallUnifiedInstaller(const fs::path& root) {
     wchar_t buffer[32768]{};
     constexpr DWORD capacity = static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0]));
@@ -59,7 +78,7 @@ void InstallUnifiedInstaller(const fs::path& root) {
     }
     VerifySignature(source);
     fs::create_directories(destination.parent_path());
-    const fs::path temporary = destination.string() + ".new";
+    const fs::path temporary = destination.wstring() + L".new";
     fs::copy_file(source, temporary, fs::copy_options::overwrite_existing);
     if (!MoveFileExW(temporary.c_str(), destination.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
         fs::remove(temporary);
@@ -116,12 +135,13 @@ std::string FileVersion(const fs::path& path) {
     return std::to_string(HIWORD(info->dwFileVersionMS)) + "." +
         std::to_string(LOWORD(info->dwFileVersionMS)) + "." + std::to_string(HIWORD(info->dwFileVersionLS));
 }
-void LaunchInstalled(const Snapshot& state) {
+void LaunchInstalled(const Snapshot& state, bool restoreSession) {
     if (state.phase != Phase::Complete || state.executable.empty() || !fs::is_regular_file(state.executable))
         throw std::runtime_error("安装尚未完成，无法启动原助理。");
     STARTUPINFOW start{}; start.cb = sizeof(start); PROCESS_INFORMATION process{};
     const auto directory = state.executable.parent_path();
     std::wstring command = L"\"" + state.executable.wstring() + L"\"";
+    if (restoreSession) command += L" --restore-installer-session";
     if (!CreateProcessW(state.executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr,
         directory.c_str(), &start, &process)) throw std::runtime_error("启动原助理失败。系统错误：" + std::to_string(GetLastError()));
     CloseHandle(process.hThread); CloseHandle(process.hProcess);

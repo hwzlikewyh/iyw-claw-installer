@@ -20,7 +20,8 @@ void VerifyDownload(const Release& release, FileWork& work);
 void InstallPackage(const Release& release, FileWork& work);
 void VerifyInstalled(const Release& release, FileWork& work);
 void InstallUnifiedInstaller(const fs::path& root);
-void LaunchInstalled(const Snapshot& state);
+void LaunchInstalled(const Snapshot& state, bool restoreSession = false);
+void LaunchExistingForUpdate(const fs::path& root);
 void CheckSystem(FileWork& work);
 fs::path UserHome();
 fs::path EnvironmentHelper(const fs::path& root);
@@ -31,6 +32,6 @@ bool ReuseApplication(const Release& release,FileWork& work);
 std::vector<std::string> MissingPresetComponents(const FileWork& work);
 void PrefetchEnvironment(FileWork& work);
 std::string HashFile(const fs::path& path);
-void PrepareEnvironment(const Release& release, FileWork& work);
+void PrepareEnvironment(const Release& release, FileWork& work, bool preparedByInstaller);
 void FinishDeployment(FileWork& work, bool success);
 }

@@ -65,13 +65,6 @@ void PollProgress(FileWork& work){
     }
     work.progress.phaseTotal=10000;work.progress.phaseDone=std::min(value,10000u);work.job.Publish(work.progress);
 }
-bool Diagnose(const fs::path& helper,FileWork& work){
-    const auto output=work.staging/"environment-diagnose.json";
-    const auto code=RunCommand({helper,{"diagnose"},output,120},[&]{Advance(work,0);});
-    if(code!=0&&code!=10)throw std::runtime_error("运行环境检查异常，请查看环境助手日志。退出码："+std::to_string(code));
-    try{return code==0&&Json::parse(ReadOutput(output)).value("status","")=="healthy";}
-    catch(const Json::exception&){throw std::runtime_error("运行环境诊断结果无效。");}
-}
 }
 void CheckEnvironment(FileWork& work){
     const auto inventory=Inventory();
@@ -86,7 +79,7 @@ void CheckEnvironment(FileWork& work){
     }
     work.job.Publish(work.progress);
 }
-void PrepareEnvironment(const Release& release,FileWork& work){
+void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByInstaller){
     BeginStage(work,Phase::Environment);
     const auto helper=EnvironmentHelper(work.progress.destination);
     if(!fs::is_regular_file(helper))throw std::runtime_error("缺少应用自带的环境助手，请重新下载安装包。");
@@ -104,6 +97,11 @@ void PrepareEnvironment(const Release& release,FileWork& work){
     const bool reusable=Compatible(Inventory(),release)&&missing.empty();
     work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Environment))]=reusable;
     if(!reusable){
+        if (preparedByInstaller) {
+            std::string names;
+            for (const auto& item : missing) { if (!names.empty()) names += ", "; names += item; }
+            throw std::runtime_error("正式安装器返回后，目标运行环境缺少组件或版本不匹配：" + names + "。请查看环境助手日志。");
+        }
         work.progress.detail="正在补齐缺失或损坏的运行环境";work.job.Publish(work.progress);
         work.progress.logPath=work.staging/"environment-repair.log";
         std::string selected;
@@ -118,7 +116,7 @@ void PrepareEnvironment(const Release& release,FileWork& work){
             std::string names;for(const auto& item:remaining){if(!names.empty())names+=", ";names+=item;}
             throw std::runtime_error("预置组件仍有缺项或版本不符："+names+"。已停止启动原助理。");
         }
-        if(!Compatible(Inventory(),release)||!Diagnose(helper,work))throw std::runtime_error("运行环境仍未完整就绪，已停止启动应用。");
+        if(!Compatible(Inventory(),release)||!MissingPresetComponents(work).empty())throw std::runtime_error("运行环境仍未完整就绪，已停止启动应用。");
     }
     work.progress.events.push_back(reusable?"全部预置组件匹配，轻量检查通过，跳过重新安装和全量摘要扫描。":"缺失或损坏的组件已修复并通过诊断。");
 }

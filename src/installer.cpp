@@ -28,7 +28,33 @@ void SaveFailure(const fs::path& directory, Snapshot& result) {
     result.logPath = path;
     log << diagnostics::Report(result);
 }
+void StageCachedPackage(const UpdateRequest& request, const Release& release, FileWork& work) {
+    const auto destination = work.staging / "setup.exe";
+    work.progress.phaseTotal = release.size;
+    work.progress.phaseDone = 0;
+    work.progress.detail = "正在复用已验证的应用更新缓存";
+    std::error_code error;
+    if (!fs::is_regular_file(request.packageCache, error) || error ||
+        fs::file_size(request.packageCache, error) != release.size || error)
+        throw std::runtime_error("应用更新缓存大小与发布记录不匹配，请重新检查更新。");
+    fs::copy_file(request.packageCache, destination, fs::copy_options::overwrite_existing, error);
+    if (error) throw std::runtime_error("无法暂存应用更新缓存：" + error.message());
+    work.progress.phaseDone = release.size;
+    work.progress.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
+    work.job.Publish(work.progress);
+    VerifyDownload(release, work);
+    work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Downloading))] = true;
+    work.progress.events.push_back("复用应用更新缓存，SHA-256 与发布者签名重新校验通过。");
+}
 void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
+    work.updateMode = request.has_value();
+    work.silentUpdate = request && request->silent;
+    work.acceptedHandoff = request && request->acceptedHandoff;
+    if (request) {
+        const auto& platform = CurrentPlatform();
+        if (platform.target != "windows" || platform.arch != "x86_64")
+            throw std::runtime_error("当前平台暂不支持统一更新交接。");
+    }
     BeginStage(work, Phase::Checking);
     ValidateRoot(work.progress.destination, work.progress);
     const auto platform = CurrentPlatform();
@@ -48,23 +74,20 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     if (fs::space(work.staging).available < release.size + 64 * MiB)
         throw std::runtime_error("临时下载目录空间不足。");
     const bool reused=ReuseApplication(release,work);
+    const bool preparedByInstaller = !reused;
     if(reused){work.progress.reused[2]=true;work.progress.reused[3]=true;work.progress.reused[5]=true;}
     if(!reused){
         if (request && !request->packageCache.empty()) {
             BeginStage(work, Phase::Downloading);
-            work.progress.phaseTotal = release.size;
             work.progress.detail = "正在复用已校验的更新缓存";
-            fs::copy_file(request->packageCache, work.staging / "setup.exe",
-                fs::copy_options::overwrite_existing);
-            VerifyDownload(release, work);
-            work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Downloading))] = true;
+            StageCachedPackage(*request, release, work);
         } else {
             DownloadPackage(release,work);VerifyDownload(release,work);
         }
     }
     PrefetchEnvironment(work);
     if(!reused)InstallPackage(release,work);
-    PrepareEnvironment(release, work); VerifyInstalled(release, work);
+    PrepareEnvironment(release, work, preparedByInstaller); VerifyInstalled(release, work);
     FinishDeployment(work, true);
     work.progress.phase = Phase::Complete;
     work.progress.completedStages = StageCount;
@@ -107,6 +130,12 @@ void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
         result.detail = result.phase == Phase::Cancelled ? "下载或校验已取消，尚未启动安装。" : error.what();
         result.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
         result.events.push_back(result.detail); SaveFailure(work.staging, result);
+        if (request && !work.installerStarted) {
+            try { LaunchExistingForUpdate(result.destination); }
+            catch (const std::exception& restart) {
+                result.events.push_back(std::string("更新未启动，重新打开旧版本失败：") + restart.what());
+            }
+        }
     }
     if(!work.staging.empty()){
         try{

@@ -24,7 +24,8 @@ constexpr int InitialHeight = 640;
 SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request)
     : wxFrame(nullptr, wxID_ANY, wxS("原助理 · 安装向导"), wxDefaultPosition, wxDefaultSize,
         wxBORDER_NONE | wxSYSTEM_MENU | wxMINIMIZE_BOX), timer_(this), animation_(this),
-        updateRequest_(std::move(request)) {
+        updateRequest_(std::move(request)), updateMode_(updateRequest_.has_value()),
+        silentUpdate_(updateRequest_ && updateRequest_->silent) {
     SetClientSize(FromDIP(wxSize(InitialWidth, InitialHeight)));
     canvas_ = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     canvas_->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -45,10 +46,13 @@ SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request)
     BindChrome();
     LayoutControls();
     if (updateRequest_) path_->SetValue(wxString::FromUTF8(updateRequest_->destination.u8string()));
+    if (silentUpdate_) path_->Hide();
     path_->SetInsertionPoint(0);
     Centre(); primary_->SetFocus();
     StartMotion();
-    if (updateRequest_) {
+    if (silentUpdate_) {
+        CallAfter([this] { StartInstall(); });
+    } else if (updateRequest_) {
         configuring_ = true;
         CallAfter([this] { StartInstall(); });
     }
@@ -148,6 +152,12 @@ void SetupWindow::UpdateControls() {
     details_->Show(failed); logs_->Show(failed); copy_->Show(failed);
     logs_->Enable(failed && !snapshot_.logPath.empty());
     if (!failed) diagnosticText_->Hide();
+    if (silentUpdate_) {
+        details_->Hide(); logs_->Hide(); copy_->Hide(); diagnosticText_->Hide();
+        path_->Hide(); browse_->Hide();
+        primary_->Hide(); secondary_->Hide();
+        close_->Hide(); minimize_->Hide();
+    }
     details_->SetLabel(diagnosticText_->IsShown() ? wxS("收起详情") : wxS("查看详情"));
     logs_->SetLabel(wxS("打开日志"));
     copy_->SetLabel(wxS("复制诊断信息"));

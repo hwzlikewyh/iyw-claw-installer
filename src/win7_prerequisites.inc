@@ -6,12 +6,17 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include "wmf_archive.inc"
 
 namespace setup {
 namespace {
 constexpr std::uint64_t DotNetBytes = 62'000'832;
 constexpr std::uint64_t WmfX64Bytes = 68'054'745;
 constexpr std::uint64_t WmfX86Bytes = 44'807'068;
+constexpr std::uint64_t WmfX64ZipBytes = 68'076'477;
+constexpr std::uint64_t WmfX86ZipBytes = 44'821'734;
+constexpr char WmfX64ZipSHA[] = "f383c34aa65332662a17d95409a2ddedadceda74427e35d05024cd0a6a2fa647";
+constexpr char WmfX86ZipSHA[] = "eb7e2c4ce2c6cb24206474a6cb8610d9f4bd3a9301f1cd8963b4ff64e529f563";
 constexpr DWORD WusaSuccessRequiresRestart = 3010;
 constexpr DWORD DotNetSuccessRequiresRestart = 1641;
 constexpr DWORD DotNetSuccessRestartSuppressed = 3010;
@@ -24,14 +29,14 @@ constexpr char DotNetURL[] =
     "80b431456d8866ebe053eb8b81a168b3/ndp462-kb3151800-x86-x64-allos-enu.exe";
 constexpr char WmfX64URL[] =
     "https://download.microsoft.com/download/6/f/5/6f5ff66c-6775-42b0-86c4-47d41f2da187/"
-    "Win7AndW2K8R2-KB3191566-x64.msu";
+    "Win7AndW2K8R2-KB3191566-x64.zip";
 constexpr char WmfX86URL[] =
     "https://download.microsoft.com/download/6/f/5/6f5ff66c-6775-42b0-86c4-47d41f2da187/"
-    "Win7-KB3191566-x86.msu";
+    "Win7-KB3191566-x86.zip";
 constexpr char WmfX64SHA[] =
     "c51abfc65dff5f6858c0b9f6420caa0c166df7a6d8b484f8a3c68ea99f0032b0";
 constexpr char WmfX86SHA[] =
-    "4575c47bedf732c7c215a5dd9e184ac2f06f10c0f23fcef38eec96b0ff3bd121";
+    "4575c47bedf732c7a215a5dd9e184ac2f06f10c0f23fcef38eec96b0ff3bd121";
 
 fs::path NativeSystemDirectory() {
     BOOL wow64 = FALSE;
@@ -173,7 +178,13 @@ void CheckWindowsManagementFramework(FileWork& work, const fs::path& cache,
     const auto url = x64 ? WmfX64URL : WmfX86URL;
     const auto hash = x64 ? WmfX64SHA : WmfX86SHA;
     const auto size = x64 ? WmfX64Bytes : WmfX86Bytes;
-    DownloadCached(url, package, size, hash, false, work);
+    if (!WmfPackageMatches(package, size, hash)) {
+        const auto archive = cache / (x64 ? "wmf-x64.zip" : "wmf-x86.zip");
+        DownloadCached(url, archive, x64 ? WmfX64ZipBytes : WmfX86ZipBytes,
+            x64 ? WmfX64ZipSHA : WmfX86ZipSHA, false, work);
+        ExtractWmfArchive(archive, package, work);
+        WaitForWmfPackage(package, size, hash, work);
+    }
     const auto wusa = NativeSystemDirectory() / L"wusa.exe";
     RunSystemInstaller(work, wusa,
         {package.u8string(), "/quiet", "/norestart"}, "Windows Management Framework 5.1");

@@ -29,6 +29,12 @@ struct Release {
 struct UpdateRequest {
     fs::path destination;
     fs::path packageCache;
+    std::string channel;
+    std::string releaseId;
+    std::string requestURL;
+    std::string accessToken;
+    bool silent = false;
+    bool acceptedHandoff = false;
     Release release;
 };
 struct PresetComponent{
@@ -84,6 +90,10 @@ struct FileWork {
     fs::path backup;
     std::map<std::string,std::string> componentURLs;
     std::vector<std::shared_ptr<void>> retainedFiles;
+    bool installerStarted = false;
+    bool updateMode = false;
+    bool silentUpdate = false;
+    bool acceptedHandoff = false;
 };
 void CheckCancel(const InstallJob& job);
 void BeginStage(FileWork& work, Phase phase);

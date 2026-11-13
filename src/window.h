@@ -11,6 +11,7 @@
 class SetupWindow : public wxFrame {
 public:
     explicit SetupWindow(std::optional<setup::UpdateRequest> request = std::nullopt);
+    bool StartsHidden() const { return silentUpdate_; }
 private:
     void Paint(wxPaintEvent& event);
     void PaintShell(wxGraphicsContext& graphics);
@@ -94,4 +95,6 @@ private:
     double transition_ = 1;
     bool animationsEnabled_ = true;
     std::optional<setup::UpdateRequest> updateRequest_;
+    bool updateMode_ = false;
+    bool silentUpdate_ = false;
 };

@@ -16,6 +16,7 @@
 extern char** environ;
 namespace setup {
 void InstallUnifiedInstaller(const fs::path&) {}
+void LaunchExistingForUpdate(const fs::path&) {}
 fs::path UserHome(){
     struct passwd user{},*result=nullptr;std::vector<char> buffer(16384);
     if(getpwuid_r(getuid(),&user,buffer.data(),buffer.size(),&result)||!result||!user.pw_dir)
@@ -87,7 +88,8 @@ void CheckSystem(FileWork& work){
 #endif
     work.job.Publish(work.progress);
 }
-void LaunchInstalled(const Snapshot& state){
+void LaunchInstalled(const Snapshot& state,bool restoreSession){
+    (void)restoreSession;
     if(state.phase!=Phase::Complete||!fs::is_regular_file(state.executable))throw std::runtime_error("安装尚未完成。");
 #ifdef __APPLE__
     std::vector<std::string> words{"/usr/bin/open",(state.destination/fs::u8path("原助理.app")).string()};
