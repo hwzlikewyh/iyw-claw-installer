@@ -51,6 +51,7 @@ void InstallUnifiedInstaller(const fs::path& root) {
     const fs::path markerPath = destination.parent_path() / "unified-installer.v1";
     std::error_code equivalentError;
     if (fs::equivalent(source, destination, equivalentError) && !equivalentError) {
+        VerifySignature(source);
         std::ofstream marker(markerPath, std::ios::binary | std::ios::trunc);
         if (!marker) throw std::runtime_error("无法保存统一安装向导版本标记。");
         marker << "1\n";
