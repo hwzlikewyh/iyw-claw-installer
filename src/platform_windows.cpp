@@ -48,8 +48,14 @@ void InstallUnifiedInstaller(const fs::path& root) {
     if (!length || length >= capacity) throw std::runtime_error("无法定位统一安装向导自身。");
     const fs::path source(buffer, buffer + length);
     const fs::path destination = root / "installer" / "原助理安装向导.exe";
+    const fs::path markerPath = destination.parent_path() / "unified-installer.v1";
     std::error_code equivalentError;
-    if (fs::equivalent(source, destination, equivalentError) && !equivalentError) return;
+    if (fs::equivalent(source, destination, equivalentError) && !equivalentError) {
+        std::ofstream marker(markerPath, std::ios::binary | std::ios::trunc);
+        if (!marker) throw std::runtime_error("无法保存统一安装向导版本标记。");
+        marker << "1\n";
+        return;
+    }
     VerifySignature(source);
     fs::create_directories(destination.parent_path());
     const fs::path temporary = destination.string() + ".new";
@@ -58,6 +64,9 @@ void InstallUnifiedInstaller(const fs::path& root) {
         fs::remove(temporary);
         throw std::runtime_error("无法保存统一安装向导。");
     }
+    std::ofstream marker(markerPath, std::ios::binary | std::ios::trunc);
+    if (!marker) throw std::runtime_error("无法保存统一安装向导版本标记。");
+    marker << "1\n";
 }
 void VerifyEnvironmentBinary(const fs::path& helper){VerifySignature(helper);}
 bool ReuseApplication(const Release& release,FileWork& work){
