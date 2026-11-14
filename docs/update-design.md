@@ -1,6 +1,6 @@
 # 统一安装与快速更新程序设计
 
-日期：2026-11-13。状态：用户已明确统一入口、流畅更新和旧版兼容目标；跨项目实施方案待确认，尚未实现或发布。
+日期：2026-11-14。状态：本文后半记录统一向导第一阶段，其中 Windows 仍委托 NSIS；该部署方式未满足“新程序负责安装和更新”的最终目标，现由[Windows 直接安装设计](superpowers/specs/2026-11-14-windows-direct-installer-design.md)取代。
 涉及项目：iyw-claw-installer、iyw-claw、iyw-fusion-api。
 
 ## 目标与验收
