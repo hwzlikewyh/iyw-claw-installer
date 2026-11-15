@@ -31,3 +31,13 @@ Claw 与 Fusion 在 `.worktrees/direct-installer-claw`、`.worktrees/direct-inst
 - 环境事务使用 stdout 专属编号；提交回执 v2 在 current snapshot 持久化后才写 committed，避免后来环境操作造成误回滚。
 - 直接安装的卸载入口保存在 root/installer 内按内容摘要命名的签名 EXE，旧副本保留供回滚；成功回执为 installer/direct-current.json。
 - 尚未执行：新签名包真实新装、旧版本升级、UAC 同账户/取消/切换账户、卸载与真实断电恢复；macOS/Linux 回归及 Win7/i686 兼容验收。完成这些前不宣称已正式发布。
+
+## 签名与集成进展
+
+- 安装器代码 `aff4365` 已合并远程 main，Fusion `f95054f` 已合并远程 master，Claw `7a2e686b` 已合并 GitHub 与内网 main。
+- 签名工作流 `43678232264` 成功。0.2.0 发布为非 Latest 配套制品，暂不替换官网下载；源提交固定 `aff43659615085fb06f52efc966a931d9efdabc6`。
+- 已从 GitHub 下载回验：EXE 4,391,296 字节，SHA-256 `e282fe758bce338a08bd61e49b639f2f1c4d00da0f89175d5ad155bc5c6ad96a`，ZIP SHA-256 `2e651102f1eefcb19f607fbba8fce6648f0c72def315b815ecca8ae9d4478be2`；ZIP 内外 EXE 完全相同。
+- 发布者为厦门市虹约产品设计有限公司，证书指纹 `E0F7DCA01BBA77A2DF1CB40A3B3459F37D4D4248`，DigiCert 时间戳有效；签名版协议检查退出 0、GUI 实际启动和正常关闭通过。签名文件已复制到 dist 与 packages。
+- 0.1.340 应用正式发布任务 `43679471534` 已启动，包含直接载荷与旧 NSIS，必须通过干净环境直接安装和旧安装迁移验证。
+- Fusion 线上 Swagger 仍无直接载荷契约，本机 SSH 无服务器登录权限；已向用户询问 Jenkins 任务地址或由用户触发部署。合并代码不代表已部署。
+- 早期一次性测试目录的递归删除被自动审查拒绝，已移入忽略的 `.cache`，未进入提交或签名包；没有绕过删除限制。
