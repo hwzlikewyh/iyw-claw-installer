@@ -10,6 +10,10 @@
 #include <set>
 #include <stdexcept>
 #include <utility>
+#include <iostream>
+#ifdef _WIN32
+#include "payload.h"
+#endif
 
 namespace {
 std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) {
@@ -51,13 +55,23 @@ std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) 
     request.release.url = request.requestURL;
     request.release.sha256 = required("sha256");
     request.release.signature = values["signature"];
+    request.release.packageKind=values["package-kind"];
+    request.release.releaseId=request.releaseId;
+    if(!request.release.packageKind.empty()&&request.release.packageKind!="app_payload_zip")throw std::runtime_error("不支持此更新包类型。");
+    if(request.release.packageKind=="app_payload_zip"&&request.release.signature.empty())throw std::runtime_error("应用载荷缺少发布签名。");
+    if(values.count("parent-pid")) {
+        const auto& id=values.at("parent-pid");
+        if(id.empty()||id.find_first_not_of("0123456789")!=std::string::npos)throw std::runtime_error("更新父进程无效。");
+        const auto parsed=std::stoull(id);if(parsed==0||parsed>0xffffffffULL)throw std::runtime_error("更新父进程超出范围。");
+        request.parentPid=static_cast<unsigned>(parsed);request.readyFile=setup::fs::u8path(required("ready-file"));
+    }
     std::size_t parsedSize = 0;
     const auto& sizeText = required("size");
     request.release.size = std::stoull(sizeText, &parsedSize);
     if (parsedSize != sizeText.size()) throw std::runtime_error("更新包大小参数无效。");
     static const std::set<std::string> allowed{
         "accepted", "access-token", "install-dir", "package-cache", "channel", "release-id", "url", "token",
-        "version", "sha256", "size", "signature",
+        "version", "sha256", "size", "signature", "package-kind", "parent-pid", "ready-file",
     };
     for (const auto& [key, value] : values) {
         (void)value;
@@ -74,8 +88,33 @@ std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) 
 
 class InstallerApp : public wxApp {
     std::unique_ptr<wxSingleInstanceChecker> instance_;
+    bool capabilityMode_ = false;
+    int processResult_ = 0;
 public:
+    int OnRun() override { return capabilityMode_ ? processResult_ : wxApp::OnRun(); }
     bool OnInit() override {
+#ifdef _WIN32
+        if(argc==4&&wxString(argv[1])==wxS("--elevated-worker")) {
+            capabilityMode_=true;
+            try {
+                unsigned long parent=0;
+                if(!wxString(argv[3]).ToULong(&parent)||!parent||parent>0xffffffffUL)throw std::runtime_error("安装调用方编号无效。");
+                processResult_=setup::RunElevatedInstall(setup::fs::path(wxString(argv[2]).ToStdWstring()),static_cast<unsigned>(parent));
+            }catch(const std::exception&){processResult_=1;}
+            return true;
+        }
+        if(argc==2&&wxString(argv[1])==wxS("--capabilities")) {
+            std::cout << "{\"protocol\":2,\"payload\":\"app_payload_zip\",\"target\":\"windows\",\"arch\":\"x86_64\"}" << std::endl;
+            capabilityMode_=true;
+            return true;
+        }
+        if(argc==3&&wxString(argv[1])==wxS("--uninstall-root")) {
+            if(wxMessageBox(wxS("卸载原助理应用？会保留项目、会话、配置和运行环境。"),wxS("卸载原助理"),wxYES_NO|wxNO_DEFAULT)!=wxYES)return false;
+            try{setup::UninstallDirect(setup::fs::path(wxString(argv[2]).ToStdWstring()));wxMessageBox(wxS("原助理应用已卸载，用户数据已保留。"),wxS("卸载完成"));}
+            catch(const std::exception& error){wxMessageBox(wxString::FromUTF8(error.what()),wxS("卸载未完成"),wxOK|wxICON_ERROR);}
+            return false;
+        }
+#endif
         SetAppName(wxS("原助理安装向导"));
         SetAppDisplayName(wxS("原助理安装向导"));
         instance_=std::make_unique<wxSingleInstanceChecker>("yuan-assistant-setup-"+wxGetUserId());

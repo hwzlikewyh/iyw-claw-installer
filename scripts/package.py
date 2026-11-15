@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ROOT / "packages"
 STAGING = ROOT / "build-package"
 APP_NAME = "原助理安装向导"
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 
@@ -36,6 +36,10 @@ def notices(destination):
         WX_SOURCE / "docs/licence.txt": "wxWidgets-LICENSE.txt",
         WX_SOURCE / "docs/lgpl.txt": "wxWidgets-LGPL.txt",
     }
+    if platform.system() == "Windows":
+        sources[ROOT / ".cache/libsodium-1.0.22/LICENSE"] = "libsodium-LICENSE.txt"
+        sources[ROOT / ".cache/libarchive-3.8.11/COPYING"] = "libarchive-LICENSE.txt"
+        sources[WX_SOURCE / "src/zlib/README"] = "zlib-LICENSE.txt"
     if platform.system() == "Darwin":
         sources[ROOT / ".cache/libsodium-1.0.22/LICENSE"] = "libsodium-LICENSE.txt"
         sources[ROOT / ".cache/libarchive-3.8.11/COPYING"] = "libarchive-LICENSE.txt"

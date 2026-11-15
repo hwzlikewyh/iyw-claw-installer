@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 import tarfile
 import urllib.request
+import platform
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / ".cache"
@@ -50,7 +51,7 @@ def main():
     options = parser.parse_args()
     CACHE.mkdir(exist_ok=True)
     fetch("wxWidgets-3.2.12")
-    if options.macos:
+    if options.macos or platform.system() == "Windows":
         fetch("libsodium-1.0.22")
         fetch("libarchive-3.8.11")
 

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.5" CACHE STRING "Minimum supported macOS version")
 endif()
-project(IywClawInstaller VERSION 0.1.0 LANGUAGES CXX)
+project(IywClawInstaller VERSION 0.2.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -43,8 +43,20 @@ set_target_properties(iyw-installer PROPERTIES
   MACOSX_BUNDLE_BUNDLE_NAME "原助理安装向导"
   MACOSX_BUNDLE_GUI_IDENTIFIER "cn.iyw.installer")
 if(WIN32)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(PAYLOAD_ARCH Win32)
+  else()
+    set(PAYLOAD_ARCH x64)
+  endif()
+  set(PAYLOAD_DEPS "${CMAKE_SOURCE_DIR}/.cache/windows-deps-${PAYLOAD_ARCH}")
+  target_include_directories(iyw-installer PRIVATE .cache/libsodium-1.0.22/src/libsodium/include .cache/libarchive-3.8.11/libarchive)
+  target_compile_definitions(iyw-installer PRIVATE SODIUM_STATIC LIBARCHIVE_STATIC)
+  target_link_libraries(iyw-installer PRIVATE "${PAYLOAD_DEPS}/sodium.lib"
+    "${PAYLOAD_DEPS}/archive/libarchive/Release/archive.lib" "${PAYLOAD_DEPS}/zlib/Release/zlibstatic.lib")
   target_sources(iyw-installer PRIVATE src/http_windows.cpp src/platform_windows.cpp src/command_windows.cpp
-    src/verify_windows.cpp src/install_windows.cpp)
+    src/verify_windows.cpp src/install_windows.cpp src/payload_verify.cpp src/payload_archive.cpp
+    src/payload_transaction.cpp src/payload_environment.cpp src/payload_process.cpp
+    src/payload_webview.cpp src/payload_registration.cpp src/payload_elevation.cpp src/payload_elevated_worker.cpp)
   target_link_libraries(iyw-installer PRIVATE winhttp bcrypt wintrust crypt32 version)
 else()
   find_package(CURL REQUIRED)

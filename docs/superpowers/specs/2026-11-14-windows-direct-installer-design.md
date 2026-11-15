@@ -1,7 +1,7 @@
 # Windows Direct Installer Design
 
 Date: 2026-11-14
-Status: Design approved by the user; awaiting written-spec review before implementation.
+Status: Written design approved by the user on 2026-11-14; implementation in progress.
 Repositories: `iyw-claw-installer`, `iyw-claw`, and `iyw-fusion-api`.
 
 ## Problem

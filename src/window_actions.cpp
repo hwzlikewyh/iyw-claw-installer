@@ -105,6 +105,7 @@ void SetupWindow::Tick(wxTimerEvent&) {
             try { setup::LaunchInstalled(snapshot_, true); Destroy(); return; }
             catch (const std::exception& error) {
                 inlineMessage_ = ToText(error.what());
+                silentUpdate_=false;
                 Show();
             }
         } else if (silentUpdate_) {

@@ -1,4 +1,5 @@
 #include "windows_support.h"
+#include "payload.h"
 #ifdef _WIN32
 #include <shellapi.h>
 #include <algorithm>
@@ -90,7 +91,8 @@ void RecordInstallFailure(FileWork& work, DWORD code, const std::pair<std::uint6
     throw std::runtime_error("正式安装器退出码：" + std::to_string(code) + "。\n" + FailureReason(text));
 }
 }
-void InstallPackage(const Release&, FileWork& work) {
+void InstallPackage(const Release& release, FileWork& work) {
+    if(release.packageKind==PayloadKind){BeginDirectInstall(release,work);return;}
     CheckCancel(work.job);
     const auto root = work.progress.destination.wstring();
     if (root.find_first_of(L"\r\n\"") != std::wstring::npos || root.size() > 240)
@@ -134,7 +136,8 @@ void VerifyInstalled(const Release& release, FileWork& work) {
     if (FileVersion(executable) != release.version)
         throw std::runtime_error("安装后的版本与 Fusion 稳定版不一致，已停止启动。");
     if(work.retainedFiles.size()!=2){VerifySignature(executable);VerifySignature(helper);}
-    try { InstallUnifiedInstaller(work.progress.destination); }
+    if(work.directPayload){RegisterDirectInstall(release,work);}
+    try { if(!work.directPayload)InstallUnifiedInstaller(work.progress.destination); }
     catch (const std::exception& error) {
         work.progress.events.push_back(std::string("统一更新入口安装失败，仍可使用原更新方式：") + error.what());
     }

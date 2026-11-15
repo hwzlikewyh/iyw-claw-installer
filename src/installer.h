@@ -25,6 +25,8 @@ struct Release {
     std::string sha256;
     std::uint64_t size = 0;
     std::string signature;
+    std::string packageKind;
+    std::string releaseId;
 };
 struct UpdateRequest {
     fs::path destination;
@@ -36,6 +38,9 @@ struct UpdateRequest {
     bool silent = false;
     bool acceptedHandoff = false;
     Release release;
+    unsigned parentPid = 0;
+    fs::path readyFile;
+    bool workerMode = false;
 };
 struct PresetComponent{
     std::string id,version,versionId,artifactId,sha256;
@@ -94,6 +99,13 @@ struct FileWork {
     bool updateMode = false;
     bool silentUpdate = false;
     bool acceptedHandoff = false;
+    bool directPayload = false;
+    bool environmentCommitted = false;
+    bool parentExited = false;
+    bool needsElevation = false;
+    std::string environmentTransaction;
+    fs::path deployment;
+    std::shared_ptr<void> installLock;
 };
 void CheckCancel(const InstallJob& job);
 void BeginStage(FileWork& work, Phase phase);

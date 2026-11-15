@@ -11,6 +11,8 @@ if (-not $cmakeTool) {
     $cmakePath = Join-Path $vsRoot 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
 } else { $cmakePath = $cmakeTool.Source }
 $outputRoot=Join-Path $projectRoot "build-$Architecture"
+& (Join-Path $PSScriptRoot 'windows-dependencies.ps1') -WxSource $sourceRoot -Architecture $Architecture
+if ($LASTEXITCODE -ne 0) { throw 'Payload dependencies failed.' }
 & $cmakePath -S $projectRoot -B $outputRoot -A $Architecture "-DWX_SOURCE_DIR=$sourceRoot" -DCMAKE_BUILD_TYPE=Release
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
 & $cmakePath --build $outputRoot --config Release --parallel 6

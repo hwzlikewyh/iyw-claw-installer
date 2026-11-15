@@ -37,6 +37,23 @@ Release ParseRelease(const std::string& body) {
         if (!data.is_object() || !data.contains("version"))
             throw std::runtime_error("Fusion 暂未发布此系统与架构的稳定版安装包。");
         if (data.at("channel") != "stable") throw std::runtime_error("Fusion 返回了非稳定通道，已停止安装。");
+        const auto platform=CurrentPlatform();
+        if(platform.target=="windows"&&platform.arch=="x86_64"&&data.contains("app_payload")) {
+            const auto& payload=data.at("app_payload");
+            const auto artifactId=payload.at("artifact_id").get<std::string>();
+            const auto releaseId=data.at("release_id").get<std::string>();
+            if(payload.at("schema_version")!=1||payload.at("package_kind")!="app_payload_zip"||
+               payload.at("release_id")!=data.at("release_id")||payload.at("target")!="windows"||payload.at("arch")!="x86_64"||
+               artifactId.empty()||artifactId[0]=='0'||artifactId.find_first_not_of("0123456789")!=std::string::npos||
+               releaseId.empty()||releaseId[0]=='0'||releaseId.find_first_not_of("0123456789")!=std::string::npos||
+               payload.at("url")!=std::string(FusionBase)+"/app-updates/artifacts/"+artifactId+"/download")
+                throw std::runtime_error("应用载荷发布身份不匹配。");
+            Release release{data.at("version"),payload.at("url"),payload.at("sha256"),payload.at("size"),payload.at("signature"),"app_payload_zip",data.at("release_id")};
+            std::string error;
+            if(!ValidateRequestedRelease(release,error)||release.signature.empty())throw std::runtime_error("应用载荷元数据无效："+error);
+            std::transform(release.sha256.begin(),release.sha256.end(),release.sha256.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+            return release;
+        }
         Release release{data.at("version"), data.at("url"), data.at("sha256"), 0};
         Version(release.version);
         const auto size = data.at("size").get<std::int64_t>();

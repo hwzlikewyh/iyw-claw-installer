@@ -1,5 +1,6 @@
 #include "windows_support.h"
 #include "command.h"
+#include "payload.h"
 #ifdef _WIN32
 #include <shellapi.h>
 #include <shlobj.h>
@@ -66,7 +67,7 @@ void InstallUnifiedInstaller(const fs::path& root) {
     const auto length = GetModuleFileNameW(nullptr, buffer, capacity);
     if (!length || length >= capacity) throw std::runtime_error("无法定位统一安装向导自身。");
     const fs::path source(buffer, buffer + length);
-    const fs::path destination = root / "installer" / "原助理安装向导.exe";
+    const fs::path destination = root / "installer" / fs::u8path("原助理安装向导.exe");
     const fs::path markerPath = destination.parent_path() / "unified-installer.v1";
     std::error_code equivalentError;
     if (fs::equivalent(source, destination, equivalentError) && !equivalentError) {
@@ -90,12 +91,22 @@ void InstallUnifiedInstaller(const fs::path& root) {
 }
 void VerifyEnvironmentBinary(const fs::path& helper){VerifySignature(helper);}
 bool ReuseApplication(const Release& release,FileWork& work){
+    if(work.directPayload&&fs::exists(work.progress.destination/"staging/direct-install.json"))return false;
     const auto executable=work.progress.destination/"app/iyw-claw.exe";
     const auto helper=EnvironmentHelper(work.progress.destination);
     if(!fs::is_regular_file(executable)||!fs::is_regular_file(helper)||FileVersion(executable)!=release.version)return false;
     try{
         auto appLock=OpenLocked(executable),helperLock=OpenLocked(helper);
         VerifySignature(executable);VerifySignature(helper);
+        if(work.directPayload) {
+            const auto output=work.staging/"reuse-helper-identity.json";
+            if(RunCommand({helper,{"--identity"},output,15})!=0)return false;
+            const auto identity=nlohmann::json::parse(ReadOutput(output));
+            if(identity.value("installerProtocol",0)!=2)return false;
+            for(const auto* path:{"resources/bundle/index.html","xinghe-resources/runtime.json","native-share/config.json","installer/webview2-setup.exe","installer/原助理安装向导.exe"})
+                if(!fs::is_regular_file(work.progress.destination/"app"/fs::u8path(path)))return false;
+            EnsureWebView(work);
+        }
         work.retainedFiles.emplace_back(appLock.release(),HandleClose{});
         work.retainedFiles.emplace_back(helperLock.release(),HandleClose{});
     }catch(const std::exception&){return false;}
@@ -107,10 +118,10 @@ void CheckSystem(FileWork& work){
     work.progress.checks.push_back("系统："+platform.target+" / "+platform.arch);
     CheckWindowsPowerShell(platform,work);
     work.progress.checks.push_back(platform.target=="windows7"?"WebView2：使用 Win7 安装包内固定 109 运行库。":
-        "WebView2：由正式安装器检测，缺失时安装微软运行库。");
+        "WebView2：安装时快速检测，缺失时补齐微软运行库。");
     work.job.Publish(work.progress);
 }
-void FinishDeployment(FileWork&,bool){}
+void FinishDeployment(FileWork& work,bool success){if(work.directPayload)FinishDirectInstall(work,success);}
 fs::path CreateStaging() {
     GUID id{}; wchar_t text[40]{};
     if (FAILED(CoCreateGuid(&id)) || !StringFromGUID2(id, text, 40)) throw std::runtime_error("无法创建安装任务标识。");

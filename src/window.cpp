@@ -162,6 +162,7 @@ void SetupWindow::UpdateControls() {
     logs_->SetLabel(wxS("打开日志"));
     copy_->SetLabel(wxS("复制诊断信息"));
     path_->Show(ready && configuring_); browse_->Show(ready && configuring_);
+    path_->Enable(!updateMode_);browse_->Enable(!updateMode_);
     primary_->Show(!Running()); primary_->Enable(!Running());
     secondary_->Enable(!cancelling_ && (!Running() || snapshot_.cancellable));
     primary_->SetLabel(snapshot_.phase == setup::Phase::Complete ? wxS("启动原助理") : ready ?

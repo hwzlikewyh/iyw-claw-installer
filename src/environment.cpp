@@ -1,5 +1,8 @@
 #include "release.h"
 #include "command.h"
+#ifdef _WIN32
+#include "payload.h"
+#endif
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
@@ -42,7 +45,8 @@ bool Compatible(const Json& inventory,const Release& release){
     }
     return true;
 }
-void PollProgress(FileWork& work){
+}
+void PollEnvironmentProgress(FileWork& work){
     std::ifstream file(work.staging/"environment-progress.ini");std::string line,phase;unsigned value=0;
     while(std::getline(file,line)){
         if(!line.empty()&&line.back()=='\r')line.pop_back();
@@ -65,7 +69,6 @@ void PollProgress(FileWork& work){
     }
     work.progress.phaseTotal=10000;work.progress.phaseDone=std::min(value,10000u);work.job.Publish(work.progress);
 }
-}
 void CheckEnvironment(FileWork& work){
     const auto inventory=Inventory();
     if(!inventory.is_object())work.progress.checks.push_back("运行环境清单：未找到有效记录，安装后将补齐。");
@@ -80,6 +83,9 @@ void CheckEnvironment(FileWork& work){
     work.job.Publish(work.progress);
 }
 void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByInstaller){
+#ifdef _WIN32
+    if(work.directPayload){PrepareDirectEnvironment(release,work);return;}
+#endif
     BeginStage(work,Phase::Environment);
     const auto helper=EnvironmentHelper(work.progress.destination);
     if(!fs::is_regular_file(helper))throw std::runtime_error("缺少应用自带的环境助手，请重新下载安装包。");
@@ -109,7 +115,7 @@ void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByIns
         if(selected.empty())for(const auto& component:work.progress.presets){if(!selected.empty())selected+=",";selected+=component.id;}
         std::vector<std::string> args{"repair","--app-version",release.version,"--progress-file",(work.staging/"environment-progress.ini").u8string()};
         if(!selected.empty()){args.push_back("--components");args.push_back(selected);}
-        const auto code=RunCommand({helper,args,work.progress.logPath,0},[&]{PollProgress(work);});
+        const auto code=RunCommand({helper,args,work.progress.logPath,0},[&]{PollEnvironmentProgress(work);});
         if(code!=0)throw std::runtime_error("环境组件修复失败，退出码："+std::to_string(code)+"，日志："+work.progress.logPath.u8string());
         const auto remaining=MissingPresetComponents(work);
         if(!remaining.empty()){

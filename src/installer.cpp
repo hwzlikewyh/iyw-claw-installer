@@ -7,6 +7,7 @@
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
+#include "payload.h"
 #endif
 namespace setup {
 namespace {
@@ -61,6 +62,11 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     CheckSystem(work); CheckEnvironment(work);
     BeginStage(work, Phase::Resolving);
     const auto release = request ? request->release : ResolveRelease(platform, work.job);
+#ifdef _WIN32
+    work.directPayload=release.packageKind==PayloadKind;
+    if(work.directPayload)LockDirectInstall(work);
+    if(work.directPayload)work.needsElevation=DirectNeedsElevation(work.progress.destination);
+#endif
     {std::ofstream identity(work.staging/"selected-release.txt",std::ios::binary);
         identity<<release.version<<'\n'<<release.sha256<<'\n';}
     work.progress.version = release.version;
@@ -73,8 +79,8 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
         throw std::runtime_error("目标磁盘空间不足，建议至少保留 2 GiB 供应用及环境安装。");
     if (fs::space(work.staging).available < release.size + 64 * MiB)
         throw std::runtime_error("临时下载目录空间不足。");
-    const bool reused=ReuseApplication(release,work);
-    const bool preparedByInstaller = !reused;
+    const bool reused=!work.needsElevation&&ReuseApplication(release,work);
+    const bool preparedByInstaller = !reused && !work.directPayload && platform.target.rfind("windows",0)==0;
     if(reused){work.progress.reused[2]=true;work.progress.reused[3]=true;work.progress.reused[5]=true;}
     if(!reused){
         if (request && !request->packageCache.empty()) {
@@ -86,6 +92,17 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
         }
     }
     PrefetchEnvironment(work);
+#ifdef _WIN32
+    if(work.needsElevation) {
+        InstallDirectElevated(release,work,request?&*request:nullptr);
+        return;
+    }
+    if(request && request->parentPid) {
+        AwaitUpdateParent(*request);
+        work.parentExited = true;
+    }
+    if(work.directPayload)RecoverDirectInstall(work);
+#endif
     if(!reused)InstallPackage(release,work);
     PrepareEnvironment(release, work, preparedByInstaller); VerifyInstalled(release, work);
     FinishDeployment(work, true);
@@ -130,7 +147,9 @@ void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
         result.detail = result.phase == Phase::Cancelled ? "下载或校验已取消，尚未启动安装。" : error.what();
         result.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
         result.events.push_back(result.detail); SaveFailure(work.staging, result);
-        if (request && !work.installerStarted) {
+        work.retainedFiles.clear();
+        work.installLock.reset();
+        if (request && !request->workerMode && (!request->parentPid || work.parentExited) && !work.installerStarted) {
             try { LaunchExistingForUpdate(result.destination); }
             catch (const std::exception& restart) {
                 result.events.push_back(std::string("更新未启动，重新打开旧版本失败：") + restart.what());

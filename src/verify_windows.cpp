@@ -1,4 +1,5 @@
 #include "windows_support.h"
+#include "payload.h"
 #ifdef _WIN32
 #include <bcrypt.h>
 #include <softpub.h>
@@ -97,7 +98,9 @@ void VerifyDownload(const Release& release, FileWork& work) {
     work.packageLock = std::shared_ptr<void>(lock.release(), HandleClose{});
     work.progress.detail = "校验 SHA-256 与发布者数字签名";
     VerifyHash(release, work);
-    CheckCancel(work.job); VerifySignature(work.staging / "setup.exe");
+    CheckCancel(work.job);
+    if(release.packageKind==PayloadKind){VerifyPayload(release,work);return;}
+    VerifySignature(work.staging / "setup.exe");
     work.progress.events.push_back("SHA-256 与原助理发布者数字签名均通过。");
 }
 }
