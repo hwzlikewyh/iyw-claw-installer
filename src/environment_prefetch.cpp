@@ -10,6 +10,7 @@ constexpr unsigned MaxComponentWorkers=2;
 struct Queue{
     FileWork& work;std::vector<const PresetComponent*> pending;
     std::atomic<std::size_t> next{0};std::atomic<bool> failed{false};std::mutex mutex;
+    std::set<std::string> skipped;
     std::chrono::steady_clock::time_point published=std::chrono::steady_clock::now();
 };
 fs::path Partial(const FileWork& work,const PresetComponent& component){return work.staging/("env-"+component.id+".part");}
@@ -31,10 +32,19 @@ void Fetch(Queue& queue,const PresetComponent& component){
     },queue.work.job);
     output.flush();if(!output||done!=component.bytes)throw std::runtime_error("组件下载未完成："+component.id);
 }
+bool SkipOptional(Queue& queue,const PresetComponent& component,const std::exception& error){
+    if(!IsOptionalPreset(component.id)||queue.work.job.IsCancelled()||queue.failed.load())return false;
+    std::lock_guard<std::mutex> guard(queue.mutex);
+    queue.skipped.insert(component.id);
+    queue.work.progress.events.push_back("可选浏览器组件 "+component.id+" 预下载未完成，将继续安装原助理："+error.what());
+    queue.work.job.Publish(queue.work.progress);
+    return true;
+}
 void Worker(Queue& queue){
     while(!queue.failed.load()){
         const auto index=queue.next.fetch_add(1);if(index>=queue.pending.size())return;
-        try{Fetch(queue,*queue.pending[index]);}catch(...){queue.failed.store(true);throw;}
+        try{Fetch(queue,*queue.pending[index]);}
+        catch(const std::exception& error){if(!SkipOptional(queue,*queue.pending[index],error)){queue.failed.store(true);throw;}}
     }
 }
 void Activate(const fs::path& source,const fs::path& target){
@@ -70,11 +80,15 @@ void PrefetchEnvironment(FileWork& work){
     std::exception_ptr failure;for(auto& worker:workers){try{worker.get();}catch(...){if(!failure)failure=std::current_exception();}}
     if(failure)std::rethrow_exception(failure);
     for(const auto* component:queue.pending){
+        if(queue.skipped.count(component->id))continue;
         CheckCancel(work.job);work.progress.detail="校验预置组件："+component->id;work.job.Publish(work.progress);
         const auto partial=Partial(work,*component);
-        if(HashFile(partial)!=component->sha256)throw std::runtime_error("预置组件摘要不匹配："+component->id);
-        Activate(partial,Cached(*component));
+        try{
+            if(HashFile(partial)!=component->sha256)throw std::runtime_error("预置组件摘要不匹配："+component->id);
+            Activate(partial,Cached(*component));
+        }catch(const std::exception& error){if(!SkipOptional(queue,*component,error))throw;}
     }
-    work.progress.events.push_back("缺失组件下载完成并通过摘要校验；由环境助手串行解包安装。");
+    work.progress.events.push_back(queue.skipped.empty()?"缺失组件下载完成并通过摘要校验；由环境助手串行解包安装。":
+        "必需组件下载完成；部分可选浏览器组件未缓存，安装完成后可在应用内修复。");
 }
 }

@@ -110,7 +110,7 @@ void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByIns
     if(!reusable){
         if (preparedByInstaller) {
             const auto requiredMissing=RequiredMissing(missing);
-            if(requiredMissing.empty()) {
+            if(requiredMissing.empty()&&Compatible(Inventory(),release)) {
                 if(!missing.empty())work.progress.events.push_back("可选浏览器组件暂未就绪，原助理仍可使用；需要浏览器能力时可在应用内修复。");
                 return;
             }
@@ -126,14 +126,20 @@ void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByIns
         std::vector<std::string> args{"repair","--app-version",release.version,"--progress-file",(work.staging/"environment-progress.ini").u8string()};
         if(!selected.empty()){args.push_back("--components");args.push_back(selected);}
         const auto code=RunCommand({helper,args,work.progress.logPath,0},[&]{PollEnvironmentProgress(work);});
-        if(code!=0)throw std::runtime_error("环境组件修复失败，退出码："+std::to_string(code)+"，日志："+work.progress.logPath.u8string());
         const auto remaining=MissingPresetComponents(work);
         const auto requiredRemaining=RequiredMissing(remaining);
+        if(code!=0&&(!requiredRemaining.empty()||!Compatible(Inventory(),release)||
+            (remaining.empty()&&!RequiredMissing(missing).empty())))
+            throw std::runtime_error("环境组件修复失败，退出码："+std::to_string(code)+"，日志："+work.progress.logPath.u8string());
         if(!requiredRemaining.empty()){
             std::string names;for(const auto& item:requiredRemaining){if(!names.empty())names+=", ";names+=item;}
             throw std::runtime_error("预置组件仍有缺项或版本不符："+names+"。已停止启动原助理。");
         }
-        if(!Compatible(Inventory(),release)||!RequiredMissing(MissingPresetComponents(work)).empty())throw std::runtime_error("运行环境基础组件仍未完整就绪，已停止启动应用。");
+        if(!Compatible(Inventory(),release))throw std::runtime_error("运行环境基础组件仍未完整就绪，已停止启动应用。");
+        if(!remaining.empty()||code!=0) {
+            work.progress.events.push_back("基础环境检查通过；可选浏览器组件暂未就绪，仅浏览器能力暂不可用，可在应用内修复。环境助手退出码："+std::to_string(code));
+            return;
+        }
     }
     work.progress.events.push_back(reusable?"全部预置组件匹配，轻量检查通过，跳过重新安装和全量摘要扫描。":"缺失或损坏的组件已修复并通过诊断。");
 }

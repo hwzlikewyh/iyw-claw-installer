@@ -23,6 +23,7 @@ void ValidateCommitted(FileWork& work) {
     for(const auto& id:missing)if(!IsOptionalPreset(id))requiredMissing.push_back(id);
     if(!requiredMissing.empty())
         throw std::runtime_error("环境提交后仍有预置组件缺失，已保留备份与恢复记录。");
+    if(!missing.empty())work.progress.events.push_back("原助理及基础环境已就绪；可选浏览器能力暂不可用，可在应用内修复。");
 }
 bool EnvironmentWasCommitted(FileWork& work) {
     if(work.environmentTransaction.empty())return false;

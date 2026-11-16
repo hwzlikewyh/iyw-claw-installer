@@ -5,6 +5,9 @@
 namespace setup {
 inline constexpr char FusionBase[] = "https://gateway.iyw.cn/iyw-fusion-api";
 using Receive = std::function<void(const char*, std::size_t)>;
+inline bool IsOptionalPreset(const std::string& id) {
+    return id == "chromix" || id == "agent-browser";
+}
 Platform CurrentPlatform();
 fs::path DefaultInstallRoot();
 fs::path CreateStaging();

@@ -93,8 +93,6 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     }
     PrefetchEnvironment(work);
 #ifdef _WIN32
-    if(work.directPayload&&!work.needsElevation)PrepareDirectPayload(release,work);
-    if(work.directPayload&&!work.needsElevation)PrepareDirectEnvironment(release,work);
     if(work.needsElevation) {
         InstallDirectElevated(release,work,request?&*request:nullptr);
         return;
