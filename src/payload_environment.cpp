@@ -12,7 +12,8 @@ void ValidatePrepared(const nlohmann::json& state, FileWork& work) {
     for(const auto& expected:work.progress.presets) {
         const auto& items=state.at("components");
         const auto found=std::find_if(items.begin(),items.end(),[&](const auto& item){return item.at("component").at("componentId")==expected.id;});
-        if(found==items.end())throw std::runtime_error("环境助手缺少必需预置组件："+expected.id);
+        if(found==items.end()&& !IsOptionalPreset(expected.id))throw std::runtime_error("环境助手缺少必需预置组件："+expected.id);
+        if(found==items.end())continue;
         const auto& actual=found->at("component");
         if(actual.at("artifactId")!=expected.artifactId||actual.at("artifactSha256")!=expected.sha256||actual.at("version")!=expected.version)
             throw std::runtime_error("环境助手组件身份与所选计划不一致："+expected.id);
@@ -20,8 +21,11 @@ void ValidatePrepared(const nlohmann::json& state, FileWork& work) {
 }
 }
 void PrepareDirectEnvironment(const Release& release, FileWork& work) {
+    if(!work.environmentTransaction.empty())return;
     BeginStage(work,Phase::Environment);
-    const auto helper=EnvironmentHelper(work.progress.destination);VerifyEnvironmentBinary(helper);
+    const auto staged=work.deployment/"incoming/app/iyw-environment.exe";
+    const auto helper=fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
+    VerifyEnvironmentBinary(helper);
     const auto output=work.staging/"environment-identity.json";
     if(RunCommand({helper,{"--identity"},output,15})!=0)throw std::runtime_error("环境助手无法运行。");
     const auto identity=nlohmann::json::parse(ReadOutput(output));

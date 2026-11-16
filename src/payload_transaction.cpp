@@ -19,7 +19,9 @@ void ValidateCommitted(FileWork& work) {
         throw std::runtime_error("环境已提交但应用版本不符，保留备份等待恢复。");
     VerifySignature(app/"iyw-claw.exe");
     VerifyEnvironmentBinary(EnvironmentHelper(work.progress.destination));
-    if(!MissingPresetComponents(work).empty())
+    const auto missing=MissingPresetComponents(work);std::vector<std::string> requiredMissing;
+    for(const auto& id:missing)if(!IsOptionalPreset(id))requiredMissing.push_back(id);
+    if(!requiredMissing.empty())
         throw std::runtime_error("环境提交后仍有预置组件缺失，已保留备份与恢复记录。");
 }
 bool EnvironmentWasCommitted(FileWork& work) {
@@ -71,7 +73,9 @@ void ConfirmCommit(FileWork& work) {
     catch(const std::exception&){work.progress.events.push_back("安装成功，旧应用备份暂留 staging。");}
 }
 void RecoverEnvironment(FileWork& work) {
-    const auto helper=EnvironmentHelper(work.progress.destination);VerifyEnvironmentBinary(helper);
+    const auto staged=work.deployment/"incoming/app/iyw-environment.exe";
+    const auto helper=fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
+    VerifyEnvironmentBinary(helper);
     if(work.staging.empty())work.staging=CreateStaging();
     if(work.environmentTransaction.size()!=32||work.environmentTransaction.find_first_not_of("0123456789abcdef")!=std::string::npos)
         throw std::runtime_error("恢复环境事务编号无效。");
@@ -155,12 +159,9 @@ void WriteDeploymentSelection(const Release& release,FileWork& work,bool reused)
 }
 void BeginDirectInstall(const Release& release,FileWork& work) {
     if(CurrentPlatform().target!="windows"||CurrentPlatform().arch!="x86_64")throw std::runtime_error("当前系统不支持该应用载荷。");
+    if(work.deployment.empty())PrepareDirectPayload(release,work);
     const auto root=work.progress.destination;RequirePlainPath(root);
-    work.deployment=root/"staging"/("direct-"+work.staging.filename().u8string());
-    RequirePlainPath(work.deployment);fs::create_directories(work.deployment);
-    BeginStage(work,Phase::Installing);
-    ExtractPayload(work);ValidatePayloadTree(work.deployment/"incoming",release);EnsureWebView(work);
-    CheckCancel(work.job);
+    BeginStage(work,Phase::Installing);CheckCancel(work.job);
     StopInstalledProcesses(root);
     const auto app=root/"app";
     if(fs::exists(app)&&!fs::is_empty(app))VerifySignature(app/"iyw-claw.exe");
@@ -171,6 +172,16 @@ void BeginDirectInstall(const Release& release,FileWork& work) {
     fs::rename(work.deployment/"incoming/app",app);
     work.installerStarted=true;SaveDeployment(work,"swapped");
     work.progress.events.push_back("新向导直接部署应用文件，等待环境提交。");
+}
+void PrepareDirectPayload(const Release& release,FileWork& work) {
+    if(!work.deployment.empty())return;
+    const auto root=work.progress.destination;RequirePlainPath(root);
+    work.deployment=root/"staging"/("direct-"+work.staging.filename().u8string());
+    RequirePlainPath(work.deployment);fs::create_directories(work.deployment);
+    BeginStage(work,Phase::Installing);
+    work.progress.detail="正在退出应用前预先校验应用载荷与 WebView2";work.job.Publish(work.progress);
+    ExtractPayload(work);ValidatePayloadTree(work.deployment/"incoming",release);EnsureWebView(work);
+    CheckCancel(work.job);
 }
 void FinishDirectInstall(FileWork& work,bool success) {
     if(work.deployment.empty()||!fs::exists(Journal(work)))return;
@@ -184,7 +195,10 @@ void FinishDirectInstall(FileWork& work,bool success) {
             RecoverEnvironment(work);
             if(!EnvironmentWasCommitted(work))Rollback(work);
         }
-        else Rollback(work);
+        else {
+            if(!work.environmentTransaction.empty())RecoverEnvironment(work);
+            Rollback(work);
+        }
         return;
     }
     SaveDeployment(work,"environment-committing");

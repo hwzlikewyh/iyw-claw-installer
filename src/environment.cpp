@@ -34,6 +34,11 @@ Json Inventory(){
         return value;
     }catch(const Json::exception&){return {};}
 }
+std::vector<std::string> RequiredMissing(const std::vector<std::string>& missing) {
+    std::vector<std::string> required;
+    for(const auto& id:missing)if(!IsOptionalPreset(id))required.push_back(id);
+    return required;
+}
 bool Compatible(const Json& inventory,const Release& release){
     const auto platform=CurrentPlatform();
     if(!inventory.is_object()||inventory.value("schemaVersion",0)!=1||inventory.value("pcVersion","")!=release.version||
@@ -104,8 +109,13 @@ void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByIns
     work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Environment))]=reusable;
     if(!reusable){
         if (preparedByInstaller) {
+            const auto requiredMissing=RequiredMissing(missing);
+            if(requiredMissing.empty()) {
+                if(!missing.empty())work.progress.events.push_back("可选浏览器组件暂未就绪，原助理仍可使用；需要浏览器能力时可在应用内修复。");
+                return;
+            }
             std::string names;
-            for (const auto& item : missing) { if (!names.empty()) names += ", "; names += item; }
+            for (const auto& item : requiredMissing) { if (!names.empty()) names += ", "; names += item; }
             throw std::runtime_error("正式安装器返回后，目标运行环境缺少组件或版本不匹配：" + names + "。请查看环境助手日志。");
         }
         work.progress.detail="正在补齐缺失或损坏的运行环境";work.job.Publish(work.progress);
@@ -118,11 +128,12 @@ void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByIns
         const auto code=RunCommand({helper,args,work.progress.logPath,0},[&]{PollEnvironmentProgress(work);});
         if(code!=0)throw std::runtime_error("环境组件修复失败，退出码："+std::to_string(code)+"，日志："+work.progress.logPath.u8string());
         const auto remaining=MissingPresetComponents(work);
-        if(!remaining.empty()){
-            std::string names;for(const auto& item:remaining){if(!names.empty())names+=", ";names+=item;}
+        const auto requiredRemaining=RequiredMissing(remaining);
+        if(!requiredRemaining.empty()){
+            std::string names;for(const auto& item:requiredRemaining){if(!names.empty())names+=", ";names+=item;}
             throw std::runtime_error("预置组件仍有缺项或版本不符："+names+"。已停止启动原助理。");
         }
-        if(!Compatible(Inventory(),release)||!MissingPresetComponents(work).empty())throw std::runtime_error("运行环境仍未完整就绪，已停止启动应用。");
+        if(!Compatible(Inventory(),release)||!RequiredMissing(MissingPresetComponents(work)).empty())throw std::runtime_error("运行环境基础组件仍未完整就绪，已停止启动应用。");
     }
     work.progress.events.push_back(reusable?"全部预置组件匹配，轻量检查通过，跳过重新安装和全量摘要扫描。":"缺失或损坏的组件已修复并通过诊断。");
 }

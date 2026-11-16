@@ -3,6 +3,9 @@
 #include <nlohmann/json.hpp>
 namespace setup {
 inline constexpr char PayloadKind[] = "app_payload_zip";
+inline bool IsOptionalPreset(const std::string& id) {
+    return id == "chromix" || id == "agent-browser";
+}
 inline constexpr std::uint64_t MaxPayloadBytes = 4ULL * 1024 * MiB;
 inline constexpr unsigned MaxPayloadFiles = 100000;
 void VerifyPayload(const Release& release, FileWork& work);
@@ -11,6 +14,7 @@ void RequirePlainPath(const fs::path& path);
 void ExtractPayload(FileWork& work);
 void ValidatePayloadTree(const fs::path& root, const Release& release);
 void BeginDirectInstall(const Release& release, FileWork& work);
+void PrepareDirectPayload(const Release& release, FileWork& work);
 void FinishDirectInstall(FileWork& work, bool success);
 void PrepareDirectEnvironment(const Release& release, FileWork& work);
 void RegisterDirectInstall(const Release& release, FileWork& work);
