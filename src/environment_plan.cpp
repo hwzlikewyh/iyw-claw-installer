@@ -32,6 +32,10 @@ void ResolvePresetEnvironment(const Release& release,FileWork& work){
             work.progress.presets.push_back(std::move(component));
             work.componentURLs[action.at("componentId").get<std::string>()]=artifact.value("url",std::string());
         }
+        if(platform.target=="windows7"&&seen.empty()){
+            work.progress.events.push_back("Win7 最低可用模式：不下载外部运行环境组件，仅保留主程序对话能力。");
+            work.job.Publish(work.progress);return;
+        }
         for(const auto* required:{"node","git","uv"})if(!seen.count(required))throw std::runtime_error("环境计划缺少必要组件："+std::string(required));
         std::string names;for(const auto& item:work.progress.presets){if(!names.empty())names+=", ";names+=item.id;}
         work.progress.events.push_back("Fusion 预置组件："+names);

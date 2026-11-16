@@ -44,6 +44,7 @@ bool Compatible(const Json& inventory,const Release& release){
     if(!inventory.is_object()||inventory.value("schemaVersion",0)!=1||inventory.value("pcVersion","")!=release.version||
         inventory.value("target","")!=platform.target||inventory.value("arch","")!=platform.arch||
         !inventory.contains("components")||!inventory["components"].is_array())return false;
+    if(platform.target=="windows7")return true;
     for(const auto* name:{"node","git","uv"}){
         if(std::none_of(inventory["components"].begin(),inventory["components"].end(),
             [&](const Json& item){return item.is_object()&&item.value("componentId","")==name;}))return false;
@@ -75,6 +76,10 @@ void PollEnvironmentProgress(FileWork& work){
     work.progress.phaseTotal=10000;work.progress.phaseDone=std::min(value,10000u);work.job.Publish(work.progress);
 }
 void CheckEnvironment(FileWork& work){
+    if(CurrentPlatform().target=="windows7"){
+        work.progress.checks.push_back("Win7 最低可用模式：仅准备主程序和 WebView2，外部运行环境按需不可用。");
+        work.job.Publish(work.progress);return;
+    }
     const auto inventory=Inventory();
     if(!inventory.is_object())work.progress.checks.push_back("运行环境清单：未找到有效记录，安装后将补齐。");
     else{
@@ -104,6 +109,10 @@ void PrepareEnvironment(const Release& release,FileWork& work,bool preparedByIns
         const std::string expected=platform.arch=="aarch64"?"aarch64-":platform.arch=="i686"?"i686-":"x86_64-";
         if(target.rfind(expected,0)!=0)throw std::runtime_error("环境助手 CPU 架构与本机不匹配。");
     }catch(const Json::exception&){throw std::runtime_error("环境助手身份无效。");}
+    if(CurrentPlatform().target=="windows7"){
+        work.progress.events.push_back("Win7 最低可用模式：跳过 Node、Git、uv 和浏览器能力组件，保留主程序对话功能。");
+        return;
+    }
     const auto missing=MissingPresetComponents(work);
     const bool reusable=Compatible(Inventory(),release)&&missing.empty();
     work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Environment))]=reusable;
