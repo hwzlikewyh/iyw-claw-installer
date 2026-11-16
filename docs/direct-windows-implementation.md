@@ -48,5 +48,15 @@ Claw 与 Fusion 在 `.worktrees/direct-installer-claw`、`.worktrees/direct-inst
 - 向导不塞进 NSIS，也不塞进 `app_payload_zip`。NSIS 继续作为旧客户端兼容制品；bootstrapper 与应用 ZIP 是同一 release 的分离下载制品。
 - 原 0.2.0 曾签名发布，但把向导复制进应用包。构建 0.2.1 替代，待回验签名后设为唯一 Latest；0.2.0 不设 Latest。
 - Fusion 新契约已部署。使用登录会话检查确认 Swagger 含 `DirectWindowsArtifact`；接口对 `0.1.332` 仍返回 NSIS 更新，对当前 `0.1.333` 和 `0.1.340` 返回无更新，旧接口字段未改变。
-- 待办：发布并设 0.2.1 为 Latest；验证 0.1.340 的签名 NSIS、独立 bootstrapper、应用 ZIP，发布 Fusion 后确认 latest 为 bootstrapper、旧版本 check 顶层仍为 NSIS。
+- 待办：签署并验收 0.2.1；发布 0.1.340 的 NSIS、独立 bootstrapper 和 app payload 到 Fusion；核对 latest 为 bootstrapper、旧版本 check 顶层仍为 NSIS；再将安装器 0.2.1 设为 Latest。
 - 原验收 CI 上传大体积中间 artifact 超时。改由隔离 Windows runner 从同一草稿下载签名制品，测试新装和旧 NSIS 升级；复用原 staging，不重编应用。
+
+## 向导在线下载应用
+
+用户明确纠正分发：官网下载/更新接口只需提供独立向导，应用包仍由这个向导从 Fusion 在线下载。
+因此 0.2.1 版不把向导嵌入 NSIS，也不把向导嵌入 `app_payload_zip`。应用 ZIP 只含主程序、助手、资源和运行所需的 WebView2 bootstrapper；新向导自己复制到安装根目录供卸载使用。
+此前 0.2.0 已签名但仍把向导嵌入应用载荷，保留为非 Latest 历史候选。新签 0.2.1 后再替代。
+
+Fusion 新接口已由登录会话回验：swagger 中存在 `DirectWindowsArtifact`；版本 0.1.332 的 Windows x64 手动更新仍返回 0.1.333 NSIS；当前版本 0.1.333 与 0.1.340 返回无更新。0.1.340 仍为 GitHub draft，Fusion latest 尚未切换。
+
+下一步：签署并回验 0.2.1 → 对 0.1.340 draft 中的已签名 NSIS/bootstrapper/应用 ZIP 执行隔离 Windows 新装与旧 NSIS 升级 → 发布 GitHub 0.1.340 → 通过已有 `release-desktop.mjs` 发布 Fusion → 确认 latest 选中 bootstrapper、旧客户端更新顶层仍为 NSIS → 将安装器 0.2.1 设 Latest。

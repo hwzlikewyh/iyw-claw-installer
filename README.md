@@ -5,9 +5,7 @@ C++17 + wxWidgets 3.2 原生安装入口。Windows 对外一个 `原助理安装
 产品名称统一为“原助理”。
 
 0.2.1 Windows x64 直接安装路径见 [实施记录](docs/direct-windows-implementation.md)。
-新版本有签名应用载荷时由向导直接部署文件；历史版本和旧平台继续使用兼容安装包。
-0.2.1 独立向导会在线下载当前应用包；不预装应用，也不嵌入应用载荷。
-当前 Latest 仍为下方 0.1.0。
+独立向导从线上下载当前应用；历史版本与旧客户端仍使用兼容 NSIS 更新。
 
 源码仓库：[hwzlikewyh/iyw-claw-installer](https://github.com/hwzlikewyh/iyw-claw-installer)。
 下载：[0.1.0 三端候选版](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.1.0)。

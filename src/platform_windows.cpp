@@ -103,7 +103,7 @@ bool ReuseApplication(const Release& release,FileWork& work){
             if(RunCommand({helper,{"--identity"},output,15})!=0)return false;
             const auto identity=nlohmann::json::parse(ReadOutput(output));
             if(identity.value("installerProtocol",0)!=2)return false;
-            for(const auto* path:{"resources/bundle/index.html","xinghe-resources/runtime.json","native-share/config.json","installer/webview2-setup.exe","installer/原助理安装向导.exe"})
+            for(const auto* path:{"resources/bundle/index.html","xinghe-resources/runtime.json","native-share/config.json","native-share/register.ps1","native-share/share-resources.ps1","native-share/IywAssistant.ShareTarget.msix","installer/webview2-setup.exe"})
                 if(!fs::is_regular_file(work.progress.destination/"app"/fs::u8path(path)))return false;
             EnsureWebView(work);
         }
