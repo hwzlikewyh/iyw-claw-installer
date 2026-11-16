@@ -45,11 +45,12 @@ Direct launch of the wizard selects the latest compatible payload. Older apps
 continue receiving the original NSIS URL and old Tauri clients ignore the new
 optional payload metadata.
 
-The archive contains only the complete installed `app/` tree, including the
-main executable, environment helper, Tauri resources, staged worker resources,
-and native-share resources. It does not contain user data or managed runtime
-directories. The archive root and manifest are deterministic and explicitly
-validated by the build pipeline.
+The downloaded payload contains only the installed app files, environment helper,
+Tauri resources, staged worker resources and native-share resources. The standalone
+bootstrapper is served separately by Fusion and downloads this payload in the same
+way the existing installer downloads its application package. Do not embed the
+bootstrapper into NSIS or the app payload. The payload contains no user data or
+managed runtime directories.
 
 The payload archive uses the existing Tauri Minisign release key and Fusion
 artifact SHA-256 metadata. Each executable within it also keeps its required

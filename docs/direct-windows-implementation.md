@@ -26,7 +26,7 @@ Claw 与 Fusion 在 `.worktrees/direct-installer-claw`、`.worktrees/direct-inst
 - 实际环境助手在独立测试根验证备份前、备份后、激活后、恢复中断及重复恢复；危险目标被拒绝，用户数据保留。
 - Rust Windows 原生信任链检查接受已签名的 0.1.0 向导，拒绝当前未签名候选。
 - 官网下载页按 target/url 取 Fusion latest，没有固定过滤 nsis。当前线上仍为 0.1.333 NSIS，尚未切换。
-- 新安装器计划版本 0.2.0。签名工作流使用固定源提交和草稿 release，不覆盖已发布 0.1.0。
+- 独立安装器 0.2.1。签名工作流使用固定源提交和草稿 release，不覆盖旧版本。
 - 权限助手仅接受同一个已签名向导、同一 Windows 账户；普通 UI 保持运行，提权结果回传后由普通 UI 启动应用。静默更新需要提权时转为手动操作。
 - 环境事务使用 stdout 专属编号；提交回执 v2 在 current snapshot 持久化后才写 committed，避免后来环境操作造成误回滚。
 - 直接安装的卸载入口保存在 root/installer 内按内容摘要命名的签名 EXE，旧副本保留供回滚；成功回执为 installer/direct-current.json。
@@ -41,3 +41,12 @@ Claw 与 Fusion 在 `.worktrees/direct-installer-claw`、`.worktrees/direct-inst
 - 0.1.340 应用正式发布任务 `43679471534` 已启动，包含直接载荷与旧 NSIS，必须通过干净环境直接安装和旧安装迁移验证。
 - Fusion 线上 Swagger 仍无直接载荷契约，本机 SSH 无服务器登录权限；已向用户询问 Jenkins 任务地址或由用户触发部署。合并代码不代表已部署。
 - 早期一次性测试目录的递归删除被自动审查拒绝，已移入忽略的 `.cache`，未进入提交或签名包；没有绕过删除限制。
+
+## 2026-11-16 用户范围修正
+
+- 对外下载独立安装向导；向导再像旧版一样从 Fusion 在线下载应用。
+- 向导不塞进 NSIS，也不塞进 `app_payload_zip`。NSIS 继续作为旧客户端兼容制品；bootstrapper 与应用 ZIP 是同一 release 的分离下载制品。
+- 原 0.2.0 曾签名发布，但把向导复制进应用包。构建 0.2.1 替代，待回验签名后设为唯一 Latest；0.2.0 不设 Latest。
+- Fusion 新契约已部署。使用登录会话检查确认 Swagger 含 `DirectWindowsArtifact`；接口对 `0.1.332` 仍返回 NSIS 更新，对当前 `0.1.333` 和 `0.1.340` 返回无更新，旧接口字段未改变。
+- 待办：发布并设 0.2.1 为 Latest；验证 0.1.340 的签名 NSIS、独立 bootstrapper、应用 ZIP，发布 Fusion 后确认 latest 为 bootstrapper、旧版本 check 顶层仍为 NSIS。
+- 原验收 CI 上传大体积中间 artifact 超时。改由隔离 Windows runner 从同一草稿下载签名制品，测试新装和旧 NSIS 升级；复用原 staging，不重编应用。

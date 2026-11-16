@@ -22,6 +22,12 @@ std::optional<std::wstring> ReadValue(const std::wstring& key,const std::wstring
 }
 std::wstring Read(const std::wstring& key,const std::wstring& name){return ReadValue(key,name).value_or(L"");}
 fs::path UserFolder(int id){wchar_t path[MAX_PATH]{};if(FAILED(SHGetFolderPathW(nullptr,id,nullptr,SHGFP_TYPE_CURRENT,path)))throw std::runtime_error("无法读取快捷方式目录。");return path;}
+fs::path PowerShell(){
+    wchar_t windows[MAX_PATH]{};const auto size=GetWindowsDirectoryW(windows,MAX_PATH);
+    if(!size||size>=MAX_PATH)throw std::runtime_error("无法定位 Windows PowerShell。");
+    BOOL wow64=FALSE;IsWow64Process(GetCurrentProcess(),&wow64);
+    return fs::path(windows)/(wow64?L"Sysnative":L"System32")/L"WindowsPowerShell/v1.0/powershell.exe";
+}
 std::vector<fs::path> Shortcuts(){return {UserFolder(CSIDL_DESKTOPDIRECTORY)/L"原助理.lnk",UserFolder(CSIDL_PROGRAMS)/L"原助理/原助理.lnk"};}
 std::vector<std::pair<std::wstring,std::wstring>> Values(){return {{InstallKey,L"InstallRoot"},{InstallKey,L""},{UninstallKey,L"DisplayName"},{UninstallKey,L"DisplayVersion"},{UninstallKey,L"Publisher"},{UninstallKey,L"InstallLocation"},{UninstallKey,L"UninstallString"},{UninstallKey,L"DisplayIcon"},{L"Software\\Classes\\iyw-assistant",L""},{L"Software\\Classes\\iyw-assistant",L"URL Protocol"},{L"Software\\Classes\\iyw-assistant\\shell\\open\\command",L""}};}
 void BackupRegistration(FileWork& work){
@@ -35,7 +41,7 @@ void BackupRegistration(FileWork& work){
     WriteDurableJSON(path,{{"values",values},{"shortcuts",shortcuts}});
 }
 fs::path InstallDirectWizard(FileWork& work){
-    const auto source=work.progress.destination/fs::u8path("app/installer/原助理安装向导.exe");
+    const auto source=CurrentInstaller();
     auto lock=OpenLocked(source);VerifySignature(source);
     const auto digest=HashFile(source);
     const auto destination=work.progress.destination/"installer"/fs::u8path("原助理安装向导-"+digest+".exe");
@@ -60,6 +66,14 @@ void Shortcut(const fs::path& path,const fs::path& executable){
     const auto status=SUCCEEDED(query)?file->Save(path.c_str(),TRUE):query;
     if(file)file->Release();link->Release();if(FAILED(status))throw std::runtime_error("保存快捷方式失败。");
 }
+void RegisterNativeShare(FileWork& work){
+    const auto script=work.progress.destination/fs::u8path("app/native-share/register.ps1");
+    try{
+        RequirePlainPath(script);
+        const auto code=RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string()},work.staging/"native-share-register.log",180});
+        work.progress.events.push_back(code==0?"系统分享入口已为当前用户注册。":"系统分享入口暂未注册，原助理启动时会自动检查并重试。注册退出码="+std::to_string(code));
+    }catch(const std::exception& error){work.progress.events.push_back(std::string("系统分享入口暂未注册，原助理启动时会自动检查并重试：")+error.what());}
+}
 }
 fs::path CurrentInstaller(){wchar_t path[32768]{};const auto size=GetModuleFileNameW(nullptr,path,32768);if(!size||size>=32768)throw std::runtime_error("无法定位安装向导。");return fs::path(path);}
 void RegisterDirectInstall(const Release& release,FileWork& work){
@@ -77,6 +91,7 @@ void RegisterDirectInstall(const Release& release,FileWork& work){
     if(FAILED(status))throw std::runtime_error("无法初始化快捷方式服务。");
     try{for(const auto& target:Shortcuts())Shortcut(target,exe);}catch(...){CoUninitialize();throw;}
     CoUninitialize();
+    RegisterNativeShare(work);
 }
 void RestoreDirectRegistration(FileWork& work){
     const auto path=work.deployment/"registration.json";if(!fs::exists(path))return;
@@ -103,11 +118,8 @@ void UninstallDirect(const fs::path& root){
     if(fs::exists(root/"app")&&!fs::is_empty(root/"app"))VerifySignature(root/"app/iyw-claw.exe");
     const auto script=root/"app/native-share/register.ps1";
     if(fs::exists(script)){
-        wchar_t system[MAX_PATH]{};if(!GetWindowsDirectoryW(system,MAX_PATH))throw std::runtime_error("无法定位 Windows 目录。");
-        BOOL wow64=FALSE;IsWow64Process(GetCurrentProcess(),&wow64);
-        const auto shell=fs::path(system)/(wow64?L"Sysnative":L"System32")/"WindowsPowerShell/v1.0/powershell.exe";
         work.staging=CreateStaging();
-        if(RunCommand({shell,{"-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string(),"-Unregister"},work.staging/"unregister.log",120})!=0)throw std::runtime_error("系统分享入口未移除，卸载已停止。");
+        if(RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string(),"-Unregister"},work.staging/"unregister.log",120})!=0)throw std::runtime_error("系统分享入口未移除，卸载已停止。");
     }
     if(fs::exists(root/"app")){
         for(const auto& entry:fs::recursive_directory_iterator(root/"app"))RequirePlainPath(entry.path());

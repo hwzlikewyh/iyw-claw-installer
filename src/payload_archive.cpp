@@ -118,8 +118,7 @@ void ValidatePayloadTree(const fs::path& root, const Release& release) {
     }
     CheckExecutable(root/"app/iyw-claw.exe",release);
     VerifyEnvironmentBinary(root/"app/iyw-environment.exe");
-    for(const auto* required:{"app/iyw-environment.exe","app/resources/bundle/index.html","app/xinghe-resources/runtime.json","app/native-share/config.json","app/installer/原助理安装向导.exe"})
+    for(const auto* required:{"app/iyw-environment.exe","app/resources/bundle/index.html","app/xinghe-resources/runtime.json","app/native-share/config.json","app/native-share/register.ps1","app/native-share/share-resources.ps1","app/native-share/IywAssistant.ShareTarget.msix","app/installer/webview2-setup.exe"})
         if(!declared.count(Fold(fs::u8path(required))))throw std::runtime_error("应用载荷缺少必要资源。");
-    VerifySignature(root/fs::u8path("app/installer/原助理安装向导.exe"));
 }
 }
