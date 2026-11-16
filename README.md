@@ -4,11 +4,11 @@ C++17 + wxWidgets 3.2 原生安装入口。Windows 对外一个 `原助理安装
 入口采用 32 位构建，可在 32/64 位 Windows 启动，并按原生系统与架构选择 Fusion 制品。
 产品名称统一为“原助理”。
 
-0.2.4 Windows x64 直接安装路径见 [实施记录](docs/direct-windows-implementation.md)。
-独立向导从线上下载当前应用；历史版本与旧客户端仍使用兼容 NSIS 更新。
+官网下载已切到 [0.2.3 独立签名向导](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.2.3)。
+向导从 Fusion 在线下载并直接部署应用；旧客户端仍通过原 NSIS 更新。详细范围和验收见 [实施记录](docs/direct-windows-implementation.md)。
 
 源码仓库：[hwzlikewyh/iyw-claw-installer](https://github.com/hwzlikewyh/iyw-claw-installer)。
-下载：[0.1.0 三端候选版](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.1.0)。
+历史候选：[0.1.0 三端包](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.1.0)。
 三端构建方式、产物格式和运行依赖见 [构建说明](docs/builds.md)。
 
 ## 使用
