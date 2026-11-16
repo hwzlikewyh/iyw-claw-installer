@@ -79,7 +79,8 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
         throw std::runtime_error("目标磁盘空间不足，建议至少保留 2 GiB 供应用及环境安装。");
     if (fs::space(work.staging).available < release.size + 64 * MiB)
         throw std::runtime_error("临时下载目录空间不足。");
-    const bool reused=!work.needsElevation&&ReuseApplication(release,work);
+    const bool pendingDirect=work.directPayload&&fs::exists(work.progress.destination/"staging/direct-install.json");
+    const bool reused=!work.needsElevation&&!pendingDirect&&ReuseApplication(release,work);
     const bool preparedByInstaller = !reused && !work.directPayload && platform.target.rfind("windows",0)==0;
     if(reused){work.progress.reused[2]=true;work.progress.reused[3]=true;work.progress.reused[5]=true;}
     if(!reused){
@@ -97,6 +98,13 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
         InstallDirectElevated(release,work,request?&*request:nullptr);
         return;
     }
+    if(work.directPayload&&!pendingDirect) {
+        if(!reused)PrepareDirectPayload(release,work);
+        else EnsureWebView(work);
+        PrepareDirectEnvironment(release,work,true);
+        CheckCancel(work.job);
+        work.progress.events.push_back("应用、WebView2 与运行环境已准备完成，开始本地切换。");
+    }
     if(request && request->parentPid) {
         AwaitUpdateParent(*request);
         work.parentExited = true;
@@ -104,7 +112,11 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     if(work.directPayload)RecoverDirectInstall(work);
 #endif
     if(!reused)InstallPackage(release,work);
-    PrepareEnvironment(release, work, preparedByInstaller); VerifyInstalled(release, work);
+    PrepareEnvironment(release, work, preparedByInstaller);
+#ifdef _WIN32
+    if(work.directPayload)SaveDeployment(work,"environment-prepared");
+#endif
+    VerifyInstalled(release, work);
     FinishDeployment(work, true);
     work.progress.phase = Phase::Complete;
     work.progress.completedStages = StageCount;

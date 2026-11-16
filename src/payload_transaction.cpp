@@ -179,7 +179,7 @@ void PrepareDirectPayload(const Release& release,FileWork& work) {
     const auto root=work.progress.destination;RequirePlainPath(root);
     work.deployment=root/"staging"/("direct-"+work.staging.filename().u8string());
     RequirePlainPath(work.deployment);fs::create_directories(work.deployment);
-    BeginStage(work,Phase::Installing);
+    BeginStage(work,Phase::Verifying);
     work.progress.detail="正在退出应用前预先校验应用载荷与 WebView2";work.job.Publish(work.progress);
     ExtractPayload(work);ValidatePayloadTree(work.deployment/"incoming",release);EnsureWebView(work);
     CheckCancel(work.job);

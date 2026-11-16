@@ -13,7 +13,7 @@ void ValidatePayloadTree(const fs::path& root, const Release& release);
 void BeginDirectInstall(const Release& release, FileWork& work);
 void PrepareDirectPayload(const Release& release, FileWork& work);
 void FinishDirectInstall(FileWork& work, bool success);
-void PrepareDirectEnvironment(const Release& release, FileWork& work);
+void PrepareDirectEnvironment(const Release& release, FileWork& work, bool beforeExit = false);
 void RegisterDirectInstall(const Release& release, FileWork& work);
 void StopInstalledProcesses(const fs::path& root);
 void EnsureWebView(FileWork& work);

@@ -20,11 +20,11 @@ void ValidatePrepared(const nlohmann::json& state, FileWork& work) {
     }
 }
 }
-void PrepareDirectEnvironment(const Release& release, FileWork& work) {
+void PrepareDirectEnvironment(const Release& release, FileWork& work, bool beforeExit) {
     if(!work.environmentTransaction.empty())return;
-    BeginStage(work,Phase::Environment);
+    BeginStage(work,beforeExit?Phase::PresetDownload:Phase::Environment);
     const auto staged=work.deployment/"incoming/app/iyw-environment.exe";
-    const auto helper=fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
+    const auto helper=!work.deployment.empty()&&fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
     VerifyEnvironmentBinary(helper);
     const auto output=work.staging/"environment-identity.json";
     if(RunCommand({helper,{"--identity"},output,15})!=0)throw std::runtime_error("环境助手无法运行。");
@@ -53,6 +53,6 @@ void PrepareDirectEnvironment(const Release& release, FileWork& work) {
         RequirePlainPath(directory);fs::create_directories(directory);work.deployment=directory;
         WriteDeploymentSelection(release,work,true);
     }
-    SaveDeployment(work,"environment-prepared");
+    // 这里只准备不可变组件；应用退出、旧事务恢复后才写全局安装事务。
 }
 }

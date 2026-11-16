@@ -1,5 +1,9 @@
 # Windows 直接安装与更新
 
+2026-11-16 最新状态：Fusion 0.1.340 已撤回，当前 stable 回到 0.1.333。
+用户选择保留该版本并先使用独立签名修复包 0.2.6；以下 0.1.340 发布验收内容为历史记录。
+可选组件兼容及预准备验证见 [本轮修复](optional-browser-hotfix.md)。
+
 ## 分发结构
 
 面向 Windows 10/11 x64，官网 Latest 下载的是独立安装向导 [原助理安装向导 0.2.3](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.2.3)，约 4.4 MB。它从 Fusion 查询当前平台的应用版本，下载并校验同一 Release 的 `app_payload_zip`，然后直接部署 `app/` 文件。
