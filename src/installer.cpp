@@ -128,7 +128,9 @@ void InstallJob::Start(UpdateRequest request) {
     Join(); cancelled_.store(false); Snapshot initial; initial.phase = Phase::Checking; initial.destination = request.destination;
     initial.version = request.release.version;
     Publish(initial);
-    try { worker_ = std::thread(&InstallJob::Run, this, request.destination, std::optional<UpdateRequest>(std::move(request))); }
+    // 先保留目标路径，不能在同一参数列表中同时读取和移动 request。
+    const auto destination = request.destination;
+    try { worker_ = std::thread(&InstallJob::Run, this, destination, std::optional<UpdateRequest>(std::move(request))); }
     catch (const std::exception& error) { initial.phase = Phase::Failed; initial.detail = error.what(); Publish(initial); }
 }
 void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
