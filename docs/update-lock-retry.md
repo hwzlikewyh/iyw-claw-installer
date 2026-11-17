@@ -23,5 +23,12 @@
 `scripts/verify-update-working-directory.ps1`，向导运行时可将继承的 app 目录改名并恢复。
 原生 C++ 回归验证重试清除旧握手、保留发布身份/缓存/签名和中文诊断；全部通过。
 
+发布状态：0.2.9 已推送 installer main（`b029c699c43c27cecc491ffe24ceb0090fbabd04`）。
+Windows 正式签名运行 `44089613614` 通过，Authenticode 与时间戳有效，签名后的 EXE 再次通过
+工作目录占用复现；Fusion 引导器 0.2.9 已发布，8 个平台制品完整下载及 SHA-256 核对通过。
+Windows 下载入口：`https://gateway.iyw.cn/iyw-fusion-api/app-updates/artifacts/381071176075563008/download`。
+macOS 正式 Developer ID 签名已验证，Apple 公证尚未提交。本次未操作用户安装目录，尚无该用户机器
+上的完整更新验证。历史 0.1.350 发布绑定的旧向导不可变，需要用户下载并运行 0.2.9 修复更新。
+
 官方依据：Microsoft SetCurrentDirectory 文档明确说明当前目录在进程执行时被锁定，阻止
 删除、移动或改名。https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setcurrentdirectory
