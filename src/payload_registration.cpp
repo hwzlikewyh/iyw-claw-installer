@@ -88,9 +88,46 @@ void Shortcut(const fs::path& path,const fs::path& executable){
     if(FAILED(file->Save(path.c_str(),TRUE)))
         throw std::runtime_error("保存快捷方式失败。");
 }
+bool CopyShellResource(const fs::path& source,const fs::path& destination){
+    RequirePlainPath(source);RequirePlainPath(destination);
+    const auto digest=HashFile(source);
+    if(fs::is_regular_file(destination)&&HashFile(destination)==digest)return false;
+    fs::create_directories(destination.parent_path());
+    fs::copy_file(source,destination,fs::copy_options::overwrite_existing);
+    if(HashFile(destination)!=digest)throw std::runtime_error("任务栏图标资源复制校验失败。");
+    return true;
+}
+void RestoreShellResources(FileWork& work){
+    const auto app=work.progress.destination/"app";const auto source=app/"native-share";
+    const auto configPath=source/"config.json";RequirePlainPath(configPath);
+    if(!fs::exists(configPath))return;
+    if(fs::file_size(configPath)>MiB)throw std::runtime_error("系统分享配置过大。");
+    std::ifstream file(configPath);const auto config=Json::parse(file);
+    if(!config.value("signed",false)||config.value("receiver",std::string{})!="main")return;
+    // 兼容旧应用包：身份包图标从 app 根目录解析，而旧注册脚本只检查 native-share。
+    for(const auto* name:{"resources.pri","Assets/Square44x44Logo.png","Assets/Square150x150Logo.png"}){
+        RequirePlainPath(source/name);
+        if(!fs::is_regular_file(source/name))throw std::runtime_error("系统分享图标资源缺失。");
+    }
+    unsigned copied=0;
+    for(const auto& entry:fs::directory_iterator(source)){
+        const auto name=entry.path().filename();
+        if(name.wstring().rfind(L"resources",0)==0&&name.extension()==L".pri")
+            copied+=CopyShellResource(entry.path(),app/name);
+    }
+    for(const auto& entry:fs::directory_iterator(source/"Assets")){
+        const auto name=entry.path().filename();
+        if(name.extension()==L".png")copied+=CopyShellResource(entry.path(),app/"Assets"/name);
+    }
+    if(copied){
+        SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,nullptr,nullptr);
+        work.progress.events.push_back("已补齐主程序目录的任务栏图标资源，文件数="+std::to_string(copied));
+    }
+}
 void RegisterNativeShare(FileWork& work){
     const auto script=work.progress.destination/fs::u8path("app/native-share/register.ps1");
     try{
+        RestoreShellResources(work);
         RequirePlainPath(script);
         const auto code=RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string()},work.staging/"native-share-register.log",180});
         work.progress.events.push_back(code==0?"系统分享入口已为当前用户注册。":"系统分享入口暂未注册，原助理启动时会自动检查并重试。注册退出码="+std::to_string(code));
