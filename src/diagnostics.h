@@ -15,6 +15,8 @@ inline std::string Lower(std::string text) {
 // 只按已记录的错误分类；未知原因保留原文，不猜测故障机状态。
 inline const std::array<const char*, 3>* Match(const std::string& detail) {
     static const std::array<const char*, 3> rules[] = {
+        {"being used by another process", "应用目录仍被进程占用，暂时无法替换。", "退出占用安装目录的程序或终端，再点击返回设置并重试；仍失败时保留日志反馈。"},
+        {"更新调用方", "原更新进程已退出或不再匹配本次更新。", "点击返回设置并重试，由安装向导重新校验缓存并完成更新。"},
         {"symbolic link or junction", "后台进程的目录链接未通过安装器检查。", "重启电脑后先不要打开原助理，再重试；若仍失败，请复制诊断信息反馈。"},
         {"需要重启后才能继续", "Windows 已准备好所需系统组件。", "重启电脑后重新运行安装程序，即可继续安装原助理。"},
         {"process control failed", "检查或关闭后台进程失败。", "退出原助理及相关任务后重试；仍失败时重启电脑，并复制诊断信息反馈。"},

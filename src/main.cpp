@@ -100,6 +100,14 @@ public:
     int OnRun() override { return capabilityMode_ ? processResult_ : wxApp::OnRun(); }
     bool OnInit() override {
 #ifdef _WIN32
+        // 更新调用继承的 app 工作目录会被本进程锁定，必须在线程启动前释放。
+        try {
+            setup::fs::current_path(setup::fs::temp_directory_path());
+        } catch (const std::exception&) {
+            wxMessageBox(wxS("无法切换安装向导工作目录，请检查系统临时目录后重试。"),
+                wxS("无法启动安装向导"), wxOK | wxICON_ERROR);
+            return false;
+        }
         (void)SetCurrentProcessExplicitAppUserModelID(L"app.iywclaw.installer");
         if(argc==4&&wxString(argv[1])==wxS("--elevated-worker")) {
             capabilityMode_=true;

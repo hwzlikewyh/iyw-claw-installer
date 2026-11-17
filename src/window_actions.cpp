@@ -1,6 +1,7 @@
 #include "window.h"
 #include "release.h"
 #include "diagnostics.h"
+#include "update_retry.h"
 #include <wx/clipbrd.h>
 #include <wx/dataobj.h>
 #include <wx/filename.h>
@@ -78,6 +79,11 @@ void SetupWindow::OnPrimary() {
         return;
     }
     if (snapshot_.phase != setup::Phase::Ready || !configuring_) {
+        if (updateRequest_ && (snapshot_.phase == setup::Phase::Failed ||
+            snapshot_.phase == setup::Phase::Cancelled)) {
+            updateRequest_ = setup::ManualUpdateRetry(*updateRequest_);
+            silentUpdate_ = false;
+        }
         snapshot_ = {}; cancelling_ = false; configuring_ = true; inlineMessage_.clear();
         BeginTransition();
         UpdateControls(); path_->SetInsertionPoint(0); primary_->SetFocus(); return;

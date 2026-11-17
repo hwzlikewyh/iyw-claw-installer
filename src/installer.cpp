@@ -27,7 +27,8 @@ void SaveFailure(const fs::path& directory, Snapshot& result) {
     std::ofstream log(path, std::ios::binary);
     if (!log) return;
     result.logPath = path;
-    log << diagnostics::Report(result);
+    // Windows 文本查看器使用 BOM 识别 UTF-8，避免中文诊断被按本地代码页打开。
+    log << "\xef\xbb\xbf" << diagnostics::Report(result);
 }
 void StageCachedPackage(const UpdateRequest& request, const Release& release, FileWork& work) {
     const auto destination = work.staging / "setup.exe";
