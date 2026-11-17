@@ -113,7 +113,8 @@ void ReportUpdateFailure(const UpdateRequest& request, const std::string& detail
         if (WaitForSingleObject(parent.get(), 0) != WAIT_TIMEOUT) return;
         constexpr std::size_t MaxErrorBytes = 8192;
         const auto error = detail.size() <= MaxErrorBytes ? detail : "更新准备失败，请查看安装向导日志。";
-        WriteDurableJSON(request.readyFile, {{"pid", GetCurrentProcessId()}, {"protocol", 2}, {"error", error}});
+        // 失败不写就绪 pid，避免旧客户端将错误回执误认成可以退出。
+        WriteDurableJSON(request.readyFile, {{"error_pid", GetCurrentProcessId()}, {"protocol", 2}, {"error", error}});
     } catch (const std::exception&) { }
 }
 void AwaitUpdateParent(const UpdateRequest& request) {
