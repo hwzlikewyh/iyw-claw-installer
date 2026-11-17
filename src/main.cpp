@@ -1,3 +1,8 @@
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#include <shobjidl_core.h>
+#endif
 #include "window.h"
 #include "release.h"
 #include <wx/app.h>
@@ -94,6 +99,7 @@ public:
     int OnRun() override { return capabilityMode_ ? processResult_ : wxApp::OnRun(); }
     bool OnInit() override {
 #ifdef _WIN32
+        (void)SetCurrentProcessExplicitAppUserModelID(L"app.iywclaw.installer");
         if(argc==4&&wxString(argv[1])==wxS("--elevated-worker")) {
             capabilityMode_=true;
             try {
