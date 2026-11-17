@@ -1,5 +1,6 @@
 #ifdef _WIN32
 #define NOMINMAX
+#include <winsock2.h>
 #include <windows.h>
 #include <shobjidl_core.h>
 #endif
