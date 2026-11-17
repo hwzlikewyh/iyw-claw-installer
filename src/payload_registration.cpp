@@ -2,6 +2,8 @@
 #include "windows_support.h"
 #include "command.h"
 #include <shlobj.h>
+#include <propkey.h>
+#include <propsys.h>
 #include <fstream>
 #include <stdexcept>
 namespace setup {
@@ -9,6 +11,10 @@ namespace {
 using Json=nlohmann::json;
 constexpr const wchar_t* InstallKey=L"Software\\iywclaw\\iyw-claw";
 constexpr const wchar_t* UninstallKey=L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\原助理";
+constexpr wchar_t AppUserModelId[]=L"app.iywclaw";
+constexpr PROPERTYKEY AppUserModelIdKey=INIT_PKEY_AppUserModel_ID;
+template<class Interface>
+struct ComRelease{void operator()(Interface* value)const noexcept{if(value)value->Release();}};
 struct KeyClose{void operator()(HKEY key)const{if(key)RegCloseKey(key);}};
 using Key=std::unique_ptr<std::remove_pointer_t<HKEY>,KeyClose>;
 Key OpenKey(const std::wstring& path){HKEY key=nullptr;if(RegCreateKeyExW(HKEY_CURRENT_USER,path.c_str(),0,nullptr,0,KEY_READ|KEY_WRITE,nullptr,&key,nullptr)!=ERROR_SUCCESS)throw std::runtime_error("无法写入应用注册信息。");return Key(key);}
@@ -59,12 +65,28 @@ fs::path InstallDirectWizard(FileWork& work){
 }
 void Shortcut(const fs::path& path,const fs::path& executable){
     RequirePlainPath(path);fs::create_directories(path.parent_path());
-    IShellLinkW* link=nullptr;
-    if(FAILED(CoCreateInstance(CLSID_ShellLink,nullptr,CLSCTX_INPROC_SERVER,IID_IShellLinkW,reinterpret_cast<void**>(&link))))throw std::runtime_error("无法创建快捷方式。");
-    link->SetPath(executable.c_str());link->SetWorkingDirectory(executable.parent_path().c_str());
-    IPersistFile* file=nullptr;const auto query=link->QueryInterface(IID_IPersistFile,reinterpret_cast<void**>(&file));
-    const auto status=SUCCEEDED(query)?file->Save(path.c_str(),TRUE):query;
-    if(file)file->Release();link->Release();if(FAILED(status))throw std::runtime_error("保存快捷方式失败。");
+    IShellLinkW* rawLink=nullptr;
+    if(FAILED(CoCreateInstance(CLSID_ShellLink,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&rawLink))))
+        throw std::runtime_error("无法创建快捷方式。");
+    std::unique_ptr<IShellLinkW,ComRelease<IShellLinkW>> link(rawLink);
+    if(FAILED(link->SetPath(executable.c_str()))||
+       FAILED(link->SetWorkingDirectory(executable.parent_path().c_str()))||
+       FAILED(link->SetIconLocation(executable.c_str(),0)))
+        throw std::runtime_error("无法设置快捷方式目标或图标。");
+    IPropertyStore* rawProperties=nullptr;
+    if(FAILED(link->QueryInterface(IID_PPV_ARGS(&rawProperties))))
+        throw std::runtime_error("无法设置快捷方式应用标识。");
+    std::unique_ptr<IPropertyStore,ComRelease<IPropertyStore>> properties(rawProperties);
+    PROPVARIANT appId{};appId.vt=VT_LPWSTR;appId.pwszVal=const_cast<PWSTR>(AppUserModelId);
+    if(FAILED(properties->SetValue(AppUserModelIdKey,appId))||
+       FAILED(properties->Commit()))
+        throw std::runtime_error("无法保存快捷方式应用标识。");
+    IPersistFile* rawFile=nullptr;
+    if(FAILED(link->QueryInterface(IID_PPV_ARGS(&rawFile))))
+        throw std::runtime_error("无法保存快捷方式。");
+    std::unique_ptr<IPersistFile,ComRelease<IPersistFile>> file(rawFile);
+    if(FAILED(file->Save(path.c_str(),TRUE)))
+        throw std::runtime_error("保存快捷方式失败。");
 }
 void RegisterNativeShare(FileWork& work){
     const auto script=work.progress.destination/fs::u8path("app/native-share/register.ps1");
