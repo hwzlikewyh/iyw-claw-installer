@@ -95,7 +95,8 @@ void StopInstalledProcesses(const fs::path& root) {
     for(const auto& process:FindProcesses(root))if(process.selected)
         throw std::runtime_error("应用后台进程重新启动，请退出后重试。");
 }
-void AwaitUpdateParent(const UpdateRequest& request) {
+namespace {
+Handle UpdateParent(const UpdateRequest& request) {
     Handle parent(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|SYNCHRONIZE,FALSE,request.parentPid));
     if(!parent||!SameUser(parent.get()))throw std::runtime_error("更新调用方身份无效。");
     wchar_t path[32768]{};DWORD size=32768;
@@ -103,6 +104,20 @@ void AwaitUpdateParent(const UpdateRequest& request) {
        fs::path(path).filename()!=L"iyw-claw.exe")throw std::runtime_error("更新调用方不是当前安装的原助理。");
     VerifySignature(fs::path(path));RequirePlainPath(request.readyFile);
     if(request.readyFile.empty()||!request.readyFile.is_absolute())throw std::runtime_error("更新握手路径无效。");
+    return parent;
+}
+}
+void ReportUpdateFailure(const UpdateRequest& request, const std::string& detail) {
+    try {
+        auto parent = UpdateParent(request);
+        if (WaitForSingleObject(parent.get(), 0) != WAIT_TIMEOUT) return;
+        constexpr std::size_t MaxErrorBytes = 8192;
+        const auto error = detail.size() <= MaxErrorBytes ? detail : "更新准备失败，请查看安装向导日志。";
+        WriteDurableJSON(request.readyFile, {{"pid", GetCurrentProcessId()}, {"protocol", 2}, {"error", error}});
+    } catch (const std::exception&) { }
+}
+void AwaitUpdateParent(const UpdateRequest& request) {
+    auto parent = UpdateParent(request);
     WriteDurableJSON(request.readyFile,{{"pid",GetCurrentProcessId()},{"protocol",2}});
     if(WaitForSingleObject(parent.get(),60000)!=WAIT_OBJECT_0)throw std::runtime_error("等待原助理退出超时，更新未开始。");
 }

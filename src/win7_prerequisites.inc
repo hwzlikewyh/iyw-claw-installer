@@ -20,7 +20,8 @@ constexpr char WmfX86ZipSHA[] = "eb7e2c4ce2c6cb24206474a6cb8610d9f4bd3a9301f1cd8
 constexpr DWORD WusaSuccessRequiresRestart = 3010;
 constexpr DWORD DotNetSuccessRequiresRestart = 1641;
 constexpr DWORD DotNetSuccessRestartSuppressed = 3010;
-constexpr DWORD DotNetMinimumRelease = 378389;
+// WMF 5.1 至少需要 .NET Framework 4.5.2；378389 仅为 4.5。
+constexpr DWORD DotNetMinimumRelease = 379893;
 constexpr char DotNetSHA[] =
     "b4cbb4bc9a3983ec3be9f80447e0d619d15256a9ce66ff414ae6e3856705e237";
 constexpr char DotNetURL[] =
@@ -211,6 +212,8 @@ void CheckWindowsPowerShell(const Platform& platform, FileWork& work) {
         const auto version = ReadVersion(work, powershell);
         unsigned major = 0;
         if (AtLeast51(version, major)) {
+            if (platform.target == "windows7")
+                InstallDotNet(work, UserHome() / L".iyw-claw/cache/prerequisites");
             work.progress.checks.push_back("PowerShell " + version + "：检查通过。");
             return;
         }

@@ -30,7 +30,7 @@ if($LASTEXITCODE -ne 0){throw 'zlib build failed'}
 Copy-Item -LiteralPath "$WxSource/src/zlib/zlib.h" -Destination "$zlib/zlib.h" -Force
 $options=@()
 foreach($feature in 'OPENSSL','MBEDTLS','NETTLE','LIBB2','LZ4','LZO','LZMA','ZSTD','BZip2','LIBXML2','EXPAT','BSDXML','WIN32_XMLLITE','PCREPOSIX','PCRE2POSIX','ICONV','ACL','XATTR','TAR','CPIO','CAT','UNZIP','TEST','INSTALL'){$options+="-DENABLE_$feature=OFF"}
-& $cmake -S "$root/.cache/libarchive-3.8.11" -B "$deps/archive" -A $Architecture -DBUILD_SHARED_LIBS=OFF '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' -DENABLE_ZLIB=ON "-DZLIB_INCLUDE_DIR=$zlib" "-DZLIB_LIBRARY=$zlib/Release/zlibstatic.lib" @options
+& $cmake -S "$root/.cache/libarchive-3.8.11" -B "$deps/archive" -A $Architecture -DWINDOWS_VERSION=WIN7 -DBUILD_SHARED_LIBS=OFF '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' -DENABLE_ZLIB=ON "-DZLIB_INCLUDE_DIR=$zlib" "-DZLIB_LIBRARY=$zlib/Release/zlibstatic.lib" @options
 if($LASTEXITCODE -ne 0){throw 'libarchive configure failed'}
 & $cmake --build "$deps/archive" --config Release --target archive_static --parallel 3
 if($LASTEXITCODE -ne 0){throw 'libarchive build failed'}

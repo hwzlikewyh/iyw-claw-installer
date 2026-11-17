@@ -53,8 +53,12 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     work.acceptedHandoff = request && request->acceptedHandoff;
     if (request) {
         const auto& platform = CurrentPlatform();
-        if (platform.target != "windows" || platform.arch != "x86_64")
+        const bool windows = platform.target == "windows" || platform.target == "windows7";
+        if (!windows || (platform.arch != "x86_64" && platform.arch != "i686"))
             throw std::runtime_error("当前平台暂不支持统一更新交接。");
+        if (request->release.packageKind == "app_payload_zip" &&
+            (platform.target != "windows" || platform.arch != "x86_64"))
+            throw std::runtime_error("此系统与架构必须使用专用应用包，不能部署普通 Windows x64 载荷。");
     }
     BeginStage(work, Phase::Checking);
     ValidateRoot(work.progress.destination, work.progress);
@@ -159,6 +163,10 @@ void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
         }
         result.phase = IsCancelled() && result.cancellable ? Phase::Cancelled : Phase::Failed;
         result.detail = result.phase == Phase::Cancelled ? "下载或校验已取消，尚未启动安装。" : error.what();
+#ifdef _WIN32
+        if (request && request->parentPid && !work.parentExited)
+            ReportUpdateFailure(*request, result.detail);
+#endif
         result.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
         result.events.push_back(result.detail); SaveFailure(work.staging, result);
         work.retainedFiles.clear();

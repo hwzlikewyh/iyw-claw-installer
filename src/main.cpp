@@ -63,7 +63,7 @@ std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) 
     request.release.signature = values["signature"];
     request.release.packageKind=values["package-kind"];
     request.release.releaseId=request.releaseId;
-    if(!request.release.packageKind.empty()&&request.release.packageKind!="app_payload_zip")throw std::runtime_error("不支持此更新包类型。");
+    if(!request.release.packageKind.empty()&&request.release.packageKind!="nsis"&&request.release.packageKind!="app_payload_zip")throw std::runtime_error("不支持此更新包类型。");
     if(request.release.packageKind=="app_payload_zip"&&request.release.signature.empty())throw std::runtime_error("应用载荷缺少发布签名。");
     if(values.count("parent-pid")) {
         const auto& id=values.at("parent-pid");
@@ -111,7 +111,8 @@ public:
             return true;
         }
         if(argc==2&&wxString(argv[1])==wxS("--capabilities")) {
-            std::cout << "{\"protocol\":2,\"payload\":\"app_payload_zip\",\"target\":\"windows\",\"arch\":\"x86_64\"}" << std::endl;
+            std::cout << "{\"protocol\":2,\"payload\":\"app_payload_zip\",\"target\":\"windows\",\"arch\":\"x86_64\","
+                "\"nsis_targets\":[\"windows/x86_64\",\"windows/i686\",\"windows7/x86_64\",\"windows7/i686\"]}" << std::endl;
             capabilityMode_=true;
             return true;
         }

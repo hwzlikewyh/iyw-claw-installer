@@ -30,5 +30,6 @@ void WriteDurableJSON(const fs::path& path, const nlohmann::json& value);
 fs::path CurrentInstaller();
 void UninstallDirect(const fs::path& root);
 void AwaitUpdateParent(const UpdateRequest& request);
+void ReportUpdateFailure(const UpdateRequest& request, const std::string& detail);
 void RestoreDirectRegistration(FileWork& work);
 }

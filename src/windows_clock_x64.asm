@@ -1,5 +1,8 @@
 EXTERN YuanCompatibleSystemTime:PROC
+EXTERN YuanCompatibleCreateFile2:PROC
 .data
 PUBLIC __imp_GetSystemTimePreciseAsFileTime
 __imp_GetSystemTimePreciseAsFileTime QWORD OFFSET YuanCompatibleSystemTime
+PUBLIC __imp_CreateFile2
+__imp_CreateFile2 QWORD OFFSET YuanCompatibleCreateFile2
 END

@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ROOT / "packages"
 STAGING = ROOT / "build-package"
 APP_NAME = "原助理安装向导"
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 
@@ -77,7 +77,7 @@ def windows():
     if re.search(r"(?:VCRUNTIME|MSVCP|wxmsw).*\.dll", dependencies, re.IGNORECASE):
         raise RuntimeError("Unexpected external GUI or CRT dependency")
     imports = run(dumpbin, "/IMPORTS", executable)
-    for name in ("GetSystemTimePreciseAsFileTime", "ProcessPrng", "CreatePseudoConsole"):
+    for name in ("GetSystemTimePreciseAsFileTime", "ProcessPrng", "CreatePseudoConsole", "CreateFile2"):
         if name in imports:
             raise RuntimeError(f"Unsupported Win7 import: {name}")
     folder = STAGING / "windows"

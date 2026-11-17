@@ -4,6 +4,9 @@ C++17 + wxWidgets 3.2 原生安装入口。Windows 对外一个 `原助理安装
 入口采用 32 位构建，可在 32/64 位 Windows 启动，并按原生系统与架构选择 Fusion 制品。
 产品名称统一为“原助理”。
 
+0.2.7 接通 Win7 x64/x86 的统一更新交接，保留旧 NSIS 更新兼容；
+微软前置组件和应用包准备完成后才通知旧应用退出。详见 [Win7 统一入口](docs/win7-unified-entry.md)。
+
 独立签名修复包为 [0.2.6 原助理安装包](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.2.6)。
 向导在线下载 Fusion 当前稳定版；有直接载荷时直接部署，历史版本沿用 NSIS 兼容路径。
 2026-11-16 回读线上稳定版为 0.1.333，0.1.340 已撤回；本轮保持该状态。
