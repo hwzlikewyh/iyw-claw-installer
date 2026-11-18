@@ -57,6 +57,7 @@ std::vector<std::string> MissingPresetComponents(const FileWork& work){
             !Committed(inventory))inventory=Json();
     }catch(const Json::exception&){inventory=Json();}
     for(const auto& expected:work.progress.presets){
+        if(expected.optional||IsOptionalPreset(expected.id))continue;
         bool valid=false;
         if(inventory.is_object())for(const auto& actual:inventory["components"]){
             try{

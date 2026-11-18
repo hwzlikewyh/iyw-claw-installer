@@ -79,7 +79,7 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     work.job.Publish(work.progress);
     ResolvePresetEnvironment(release,work);
     constexpr std::uint64_t MinimumFree = 2ULL * 1024 * MiB;
-    std::uint64_t presetBytes=0;for(const auto& component:work.progress.presets)presetBytes+=component.bytes;
+    std::uint64_t presetBytes=0;for(const auto& component:work.progress.presets)if(!component.optional)presetBytes+=component.bytes;
     if (work.progress.availableBytes < std::max(MinimumFree, (release.size+presetBytes) * 3))
         throw std::runtime_error("目标磁盘空间不足，建议至少保留 2 GiB 供应用及环境安装。");
     if (fs::space(work.staging).available < release.size + 64 * MiB)

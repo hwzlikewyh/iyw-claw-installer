@@ -100,7 +100,7 @@ void LoadRecovery(FileWork& work) {
     selection.at("oldApp").get<bool>();selection.at("reused").get<bool>();
     work.environmentTransaction=journal.at("environmentTransaction");work.progress.version=journal.at("version");
     work.progress.presets.clear();
-    for(const auto& item:selection.at("presets"))work.progress.presets.push_back({item.at("id"),item.at("version"),item.at("versionId"),item.at("artifactId"),item.at("sha256"),item.at("bytes")});
+    for(const auto& item:selection.at("presets"))work.progress.presets.push_back({item.at("id"),item.at("version"),item.at("versionId"),item.at("artifactId"),item.at("sha256"),item.value("optional",IsOptionalPreset(item.at("id").get<std::string>())),item.at("bytes")});
     RequirePlainPath(work.progress.destination/"app");
 }
 }
@@ -154,7 +154,7 @@ void RecoverDirectInstall(FileWork& work) {
 }
 void WriteDeploymentSelection(const Release& release,FileWork& work,bool reused) {
     Json presets=Json::array();
-    for(const auto& item:work.progress.presets)presets.push_back({{"id",item.id},{"version",item.version},{"versionId",item.versionId},{"artifactId",item.artifactId},{"sha256",item.sha256},{"bytes",item.bytes}});
+    for(const auto& item:work.progress.presets)presets.push_back({{"id",item.id},{"version",item.version},{"versionId",item.versionId},{"artifactId",item.artifactId},{"sha256",item.sha256},{"optional",item.optional},{"bytes",item.bytes}});
     WriteDurableJSON(work.deployment/"selection.json",{{"root",work.progress.destination.lexically_normal().u8string()},
         {"version",release.version},{"sha256",release.sha256},{"oldApp",fs::exists(work.progress.destination/"app")},{"reused",reused},{"presets",presets}});
 }

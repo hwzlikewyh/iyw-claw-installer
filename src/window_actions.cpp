@@ -74,7 +74,13 @@ void SetupWindow::StartInstall() {
 void SetupWindow::OnPrimary() {
     if (Running()) return;
     if (snapshot_.phase == setup::Phase::Complete) {
-        try { setup::LaunchInstalled(snapshot_); Close(); }
+        try {
+            auto launch = snapshot_;
+            if (launch.executable.empty())
+                launch.executable = launch.destination / "app/iyw-claw.exe";
+            setup::LaunchInstalled(launch);
+            Close();
+        }
         catch (const std::exception& error) { inlineMessage_=ToText(error.what());canvas_->Refresh(); }
         return;
     }

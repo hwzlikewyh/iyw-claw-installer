@@ -134,7 +134,10 @@ void SetupWindow::Paint(wxPaintEvent&) {
     graphics->Scale(scale, scale);
     PaintArtwork(*graphics);
     if(Running())PaintTips(*graphics);
-    if(!Running()&&transition_>=1)return;
+    if(!Running()&&transition_>=1){
+        if(!inlineMessage_.empty())ui::Text(*graphics,{inlineMessage_,{520,490},11,ui::Accent});
+        return;
+    }
     graphics->PushState();
     graphics->Clip(500, 90, 430, 483);
     const auto offset = (1.0 - transition_) * 24;

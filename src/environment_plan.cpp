@@ -24,7 +24,9 @@ void ResolvePresetEnvironment(const Release& release,FileWork& work){
         for(const auto& action:plan.at("actions")){
             const auto& artifact=action.at("artifact");
             PresetComponent component{action.at("componentId"),action.at("version"),artifact.at("versionId"),
-                artifact.at("artifactId"),artifact.at("sha256"),artifact.at("size")};
+                artifact.at("artifactId"),artifact.at("sha256"),false,artifact.at("size")};
+            const bool core=component.id=="node"||component.id=="git"||component.id=="uv";
+            component.optional=!core&&(action.value("optional",false)||IsOptionalPreset(component.id));
             if(component.id.empty()||component.id.size()>64||component.id.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-")!=std::string::npos||
                 !seen.insert(component.id).second||component.bytes>4ULL*1024*MiB||component.bytes==0||component.sha256.size()!=64||
                 !std::all_of(component.sha256.begin(),component.sha256.end(),[](unsigned char c){return std::isxdigit(c);}))
@@ -37,9 +39,10 @@ void ResolvePresetEnvironment(const Release& release,FileWork& work){
             work.job.Publish(work.progress);return;
         }
         for(const auto* required:{"node","git","uv"})if(!seen.count(required))throw std::runtime_error("环境计划缺少必要组件："+std::string(required));
-        std::string names;for(const auto& item:work.progress.presets){if(!names.empty())names+=", ";names+=item.id;}
+        std::string names;for(const auto& item:work.progress.presets){if(item.optional)continue;if(!names.empty())names+=", ";names+=item.id;}
         work.progress.events.push_back("Fusion 预置组件："+names);
-        work.progress.detail="已取得 "+std::to_string(work.progress.presets.size())+" 个预置组件的安装计划";
+        const auto requiredCount=std::count_if(work.progress.presets.begin(),work.progress.presets.end(),[](const auto& item){return !item.optional;});
+        work.progress.detail="已取得 "+std::to_string(requiredCount)+" 个必需预置组件的安装计划";
         work.job.Publish(work.progress);
     }catch(const Json::exception&){throw std::runtime_error("Fusion 预置环境计划响应无效。");}
 }

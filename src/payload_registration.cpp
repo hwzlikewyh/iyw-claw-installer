@@ -97,13 +97,13 @@ bool CopyShellResource(const fs::path& source,const fs::path& destination){
     if(HashFile(destination)!=digest)throw std::runtime_error("任务栏图标资源复制校验失败。");
     return true;
 }
-void RestoreShellResources(FileWork& work){
+bool RestoreShellResources(FileWork& work){
     const auto app=work.progress.destination/"app";const auto source=app/"native-share";
     const auto configPath=source/"config.json";RequirePlainPath(configPath);
-    if(!fs::exists(configPath))return;
+    if(!fs::exists(configPath))return false;
     if(fs::file_size(configPath)>MiB)throw std::runtime_error("系统分享配置过大。");
     std::ifstream file(configPath);const auto config=Json::parse(file);
-    if(!config.value("signed",false)||config.value("receiver",std::string{})!="main")return;
+    if(!config.value("signed",false)||config.value("receiver",std::string{})!="main")return false;
     // 兼容旧应用包：身份包图标从 app 根目录解析，而旧注册脚本只检查 native-share。
     for(const auto* name:{"resources.pri","Assets/Square44x44Logo.png","Assets/Square150x150Logo.png"}){
         RequirePlainPath(source/name);
@@ -123,15 +123,34 @@ void RestoreShellResources(FileWork& work){
         SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,nullptr,nullptr);
         work.progress.events.push_back("已补齐主程序目录的任务栏图标资源，文件数="+std::to_string(copied));
     }
+    return true;
 }
+constexpr char RegisterMainIdentity[]=R"ps($ErrorActionPreference='Stop'
+if ([Environment]::OSVersion.Version.Build -lt 19041) { exit 23 }
+$env:PSModulePath=[IO.Path]::Combine($PSHOME,'Modules')
+$share=[Environment]::CurrentDirectory
+$app=[IO.Directory]::GetParent($share).FullName
+$config=Get-Content -LiteralPath (Join-Path $share 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$installed=Get-AppxPackage -Name 'IywAssistant.Desktop'
+if (!$installed -or $installed.Version -ne [version]$config.packageVersion -or $installed.Status -ne 'Ok') {
+    Add-AppxPackage -Path (Join-Path $share 'IywAssistant.ShareTarget.msix') -ExternalLocation $app -ForceUpdateFromAnyVersion -ForceTargetApplicationShutdown
+}
+& (Join-Path $share 'register.ps1')
+exit $LASTEXITCODE)ps";
 void RegisterNativeShare(FileWork& work){
     const auto script=work.progress.destination/fs::u8path("app/native-share/register.ps1");
+    const bool required=RestoreShellResources(work);
+    const auto log=work.staging/"native-share-register.log";
     try{
-        RestoreShellResources(work);
         RequirePlainPath(script);
-        const auto code=RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string()},work.staging/"native-share-register.log",180});
+        if(!required&&!fs::is_regular_file(script))return;
+        constexpr int unsupportedIdentity=23;
+        const auto code=RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass",
+            required?"-Command":"-File",required?RegisterMainIdentity:script.u8string()},log,180,script.parent_path()});
+        if(required&&code==unsupportedIdentity){work.progress.events.push_back("此 Windows 版本不支持系统分享身份，已跳过。");return;}
+        if(required&&code!=0)throw std::runtime_error("Windows 未完成主程序身份注册或启动检查。详见 native-share-register.log.stderr。退出码："+std::to_string(code));
         work.progress.events.push_back(code==0?"系统分享入口已为当前用户注册。":"系统分享入口暂未注册，原助理启动时会自动检查并重试。注册退出码="+std::to_string(code));
-    }catch(const std::exception& error){work.progress.events.push_back(std::string("系统分享入口暂未注册，原助理启动时会自动检查并重试：")+error.what());}
+    }catch(const std::exception& error){if(required)throw;work.progress.events.push_back(std::string("系统分享入口暂未注册，原助理启动时会自动检查并重试：")+error.what());}
 }
 }
 fs::path CurrentInstaller(){wchar_t path[32768]{};const auto size=GetModuleFileNameW(nullptr,path,32768);if(!size||size>=32768)throw std::runtime_error("无法定位安装向导。");return fs::path(path);}

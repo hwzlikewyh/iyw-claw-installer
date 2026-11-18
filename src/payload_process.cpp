@@ -85,7 +85,8 @@ void TerminateSelected(Process& process) {
 void StopInstalledProcesses(const fs::path& root) {
     auto targets=FindProcesses(root);SelectChildren(targets);
     for(const auto& process:targets)if(process.selected)EnumWindows(CloseWindowForProcess,process.id);
-    const auto deadline=GetTickCount64()+15000;
+    constexpr DWORD CloseGraceMs=1500;
+    const auto deadline=GetTickCount64()+CloseGraceMs;
     for(auto& process:targets) {
         if(!process.selected)continue;
         const auto now=GetTickCount64();const auto timeout=now<deadline?static_cast<DWORD>(deadline-now):0;

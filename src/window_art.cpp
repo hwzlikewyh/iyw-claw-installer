@@ -119,6 +119,5 @@ void SetupWindow::BuildStaticPage(){
     const double scale=FromDIP(100)/100.0;graphics->Scale(scale,scale);
     graphics->DrawBitmap(backdrop_,0,0,Width(),Height());PaintShell(*graphics);PaintRoute(*graphics);
     if(!Running()&&transition_>=1)PaintContent(*graphics);
-    if(!inlineMessage_.empty())ui::Text(*graphics,{inlineMessage_,{520,490},11,ui::Accent});
     pageDirty_=false;
 }

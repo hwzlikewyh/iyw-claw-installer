@@ -44,6 +44,7 @@ struct UpdateRequest {
 };
 struct PresetComponent{
     std::string id,version,versionId,artifactId,sha256;
+    bool optional=false;
     std::uint64_t bytes=0;
 };
 struct Snapshot {

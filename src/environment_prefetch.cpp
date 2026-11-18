@@ -65,6 +65,7 @@ void PrefetchEnvironment(FileWork& work){
     Queue queue{work,{}};work.progress.phaseTotal=0;
     for(const auto& component:work.progress.presets){
         if(!selected.count(component.id))continue;
+        if(component.optional||IsOptionalPreset(component.id))continue;
         const auto cache=Cached(component);
         if(fs::is_regular_file(cache)&&fs::file_size(cache)==component.bytes&&HashFile(cache)==component.sha256)continue;
         queue.pending.push_back(&component);work.progress.phaseTotal+=component.bytes;
