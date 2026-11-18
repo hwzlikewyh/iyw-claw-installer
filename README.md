@@ -6,13 +6,17 @@ C++17 + wxWidgets 3.2 原生安装入口。Windows 对外一个 `原助理安装
 
 Windows 更新后提示“无法打开此应用”的本机根因、修复记录和下载流量核验见[启动修复记录](docs/windows-launch-repair.md)。
 
+0.2.10 修复 Windows 7 WMF 5.1 本地安装、重启后续装及更新时的系统 API 兼容；
+同时保留更新期间的文件释放和应用身份检查。详见 [Win7 统一入口](docs/win7-unified-entry.md) 与
+[Windows 更新锁与重试](docs/update-lock-retry.md)。
+
 0.2.9 修复应用内更新时向导自身锁住 app 目录，以及失败后重试复用已失效的父进程；
 中文诊断日志显式写入 UTF-8 BOM。详见 [更新与重试修复](docs/update-lock-retry.md)。
 
 0.2.8 接通 Win7 x64/x86 的统一更新交接，保留旧 NSIS 更新兼容；
 微软前置组件和应用包准备完成后才通知旧应用退出。详见 [Win7 统一入口](docs/win7-unified-entry.md)。
 
-独立签名修复包为 [0.2.8 原助理安装包](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.2.8)。
+独立签名安装包为 [0.2.10 原助理安装包](https://github.com/hwzlikewyh/iyw-claw-installer/releases/tag/v0.2.10)。
 向导在线下载 Fusion 当前稳定版；有直接载荷时直接部署，历史版本沿用 NSIS 兼容路径。
 2026-11-16 回读线上稳定版为 0.1.333，0.1.340 已撤回；本轮保持该状态。
 详细范围和验收见 [安装兼容修复](docs/optional-browser-hotfix.md)。
