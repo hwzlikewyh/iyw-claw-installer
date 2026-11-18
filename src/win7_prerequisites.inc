@@ -1,5 +1,7 @@
 #include "windows_support.h"
 #include "command.h"
+#include "win7_restart.h"
+#include "wmf_identity.h"
 #ifdef _WIN32
 #include <algorithm>
 #include <cctype>
@@ -17,9 +19,7 @@ constexpr std::uint64_t WmfX64ZipBytes = 68'076'477;
 constexpr std::uint64_t WmfX86ZipBytes = 44'821'734;
 constexpr char WmfX64ZipSHA[] = "f383c34aa65332662a17d95409a2ddedadceda74427e35d05024cd0a6a2fa647";
 constexpr char WmfX86ZipSHA[] = "eb7e2c4ce2c6cb24206474a6cb8610d9f4bd3a9301f1cd8963b4ff64e529f563";
-constexpr DWORD WusaSuccessRequiresRestart = 3010;
-constexpr DWORD DotNetSuccessRequiresRestart = 1641;
-constexpr DWORD DotNetSuccessRestartSuppressed = 3010;
+constexpr DWORD WmfUnsupportedOperation = 0x80240037;
 // WMF 5.1 至少需要 .NET Framework 4.5.2；378389 仅为 4.5。
 constexpr DWORD DotNetMinimumRelease = 379893;
 constexpr char DotNetSHA[] =
@@ -34,10 +34,6 @@ constexpr char WmfX64URL[] =
 constexpr char WmfX86URL[] =
     "https://download.microsoft.com/download/6/f/5/6f5ff66c-6775-42b0-86c4-47d41f2da187/"
     "Win7-KB3191566-x86.zip";
-constexpr char WmfX64SHA[] =
-    "c51abfc65dff5f6858c0b9f6420caa0c166df7a6d8b484f8a3c68ea99f0032b0";
-constexpr char WmfX86SHA[] =
-    "4575c47bedf732c7a215a5dd9e184ac2f06f10c0f23fcef38eec96b0ff3bd121";
 
 fs::path NativeSystemDirectory() {
     BOOL wow64 = FALSE;
@@ -55,7 +51,7 @@ fs::path NativeSystemDirectory() {
 std::string ReadVersion(FileWork& work, const fs::path& powershell) {
     const auto output = work.staging / "powershell-check.log";
     const auto code = RunCommand({powershell,
-        {"-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"},
+        {"-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; $PSVersionTable.PSVersion.ToString(); exit 0"},
         output, 30});
     auto version = ReadOutput(output);
     version.erase(std::remove_if(version.begin(), version.end(), [](unsigned char value) {
@@ -137,6 +133,31 @@ void DownloadCached(const std::string& url, const fs::path& target,
     }
 }
 
+void CheckSystemInstallerResult(int code, const char* component, const fs::path& details) {
+    if (RequiresSystemRestart(static_cast<unsigned>(code)))
+        throw SystemRestart(std::string(component) + " 已安装，Windows 需要重启后才能继续。");
+    constexpr DWORD MissingServicingSource = 0x800f081f;
+    if (!details.empty() && static_cast<DWORD>(code) == MissingServicingSource)
+        throw std::runtime_error("Windows 本地安装 WMF 时找不到所需组件源（0x800F081F）。请提供本次安装时段的 CBS.log。\n" + ReadOutput(details));
+    if (code == 1058) {
+        const auto log = details.empty() ? std::string() : ReadOutput(details);
+        throw std::runtime_error(std::string(component) +
+            " 安装失败：Windows 服务被禁用（错误 1058）。请检查 Windows Modules Installer "
+            "(TrustedInstaller) 和 Windows Update (wuauserv) 服务设置；若由组织策略禁用，请联系管理员。" +
+            (log.empty() ? std::string() : "\n服务状态记录：\n" + log));
+    }
+    if (!details.empty() && static_cast<DWORD>(code) == WmfUnsupportedOperation)
+        throw std::runtime_error("Windows Management Framework 5.1 安装失败：Windows Update Agent "
+            "更新搜索返回不支持操作错误（0x80240037）；已尝试解包并通过 Package Manager 本地安装。"
+            "请查看诊断中的本地安装返回码和 CBS 日志；这不是服务被禁用错误。" +
+            (details.empty() ? std::string() : "\n服务状态记录：\n" + ReadOutput(details)));
+    if (code == 0) return;
+    const auto log = details.empty() ? std::string() : ReadOutput(details);
+    throw std::runtime_error(std::string(component) + " 安装失败，Windows 退出码：" +
+        std::to_string(code) + "。请查看 Windows 组件安装日志和系统服务状态后重试。" +
+        (log.empty() ? std::string() : "\n服务状态记录：\n" + log));
+}
+
 void RunSystemInstaller(FileWork& work, const fs::path& executable,
     std::vector<std::string> arguments, const char* component) {
     work.progress.cancellable = false;
@@ -149,14 +170,42 @@ void RunSystemInstaller(FileWork& work, const fs::path& executable,
         [&] { Advance(work, 0); });
     work.progress.cancellable = true;
     work.job.Publish(work.progress);
-    if (code == static_cast<int>(WusaSuccessRequiresRestart) ||
-        code == static_cast<int>(DotNetSuccessRequiresRestart) ||
-        code == static_cast<int>(DotNetSuccessRestartSuppressed))
-        throw std::runtime_error(std::string(component) +
-            " 已安装，但 Windows 需要重启后才能继续。请重启电脑，然后重新运行安装程序。");
-    if (code != 0)
-        throw std::runtime_error(std::string(component) + " 安装失败，Windows 退出码：" +
-            std::to_string(code) + "。请关闭其他 Windows 更新程序后重试。");
+    CheckSystemInstallerResult(code, component, {});
+}
+
+void RunWmfInstaller(FileWork& work, const WmfInstallRequest& request) {
+    work.progress.cancellable = false;
+    work.progress.detail = "正在授权并准备 WMF 5.1";
+    work.progress.phaseDone = 0;
+    work.progress.phaseTotal = 0;
+    work.job.Publish(work.progress);
+    int code = 0;
+    try {
+        const auto directory = WmfLiveDirectory(work.staging);
+        auto nextCheck = std::chrono::steady_clock::now();
+        code = RunWmfInstallerElevated(request, [&] {
+            const auto now = std::chrono::steady_clock::now();
+            if (now < nextCheck) return;
+            nextCheck = now + std::chrono::seconds(1);
+            std::error_code error;
+            const std::string status = fs::exists(directory / L"wmf-pkgmgr-output.log", error) ? "Windows 正在写入本地 WMF 组件" :
+                fs::exists(directory / L"wmf-expand-output.log", error) ? "正在解包 WMF 本地安装源" :
+                fs::exists(directory / L"wmf-install.log", error) ? "Windows 正在检查 WMF 更新适用性" : "正在授权并准备 WMF 5.1";
+            if (work.progress.detail != status) {
+                work.progress.detail = status;
+                const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - work.started).count();
+                work.progress.events.push_back(std::to_string(elapsed) + " s  " + status);
+            }
+            Advance(work, 0);
+        });
+    } catch (...) {
+        work.progress.cancellable = true;
+        work.job.Publish(work.progress);
+        throw;
+    }
+    work.progress.cancellable = true;
+    work.job.Publish(work.progress);
+    CheckSystemInstallerResult(code, "Windows Management Framework 5.1", request.serviceLog);
 }
 
 void InstallDotNet(FileWork& work, const fs::path& cache) {
@@ -175,7 +224,7 @@ void CheckWindowsManagementFramework(FileWork& work, const fs::path& cache,
     if (platform.arch != "x86_64" && platform.arch != "i686")
         throw std::runtime_error("Windows 7 当前架构不支持受管 PowerShell 5.1 安装。");
     const bool x64 = platform.arch == "x86_64";
-    const auto package = cache / (x64 ? "Win7AndW2K8R2-KB3191566-x64.msu" : "Win7-KB3191566-x86.msu");
+    const auto package = cache / WmfPackageName(x64);
     const auto url = x64 ? WmfX64URL : WmfX86URL;
     const auto hash = x64 ? WmfX64SHA : WmfX86SHA;
     const auto size = x64 ? WmfX64Bytes : WmfX86Bytes;
@@ -187,8 +236,9 @@ void CheckWindowsManagementFramework(FileWork& work, const fs::path& cache,
         WaitForWmfPackage(package, size, hash, work);
     }
     const auto wusa = NativeSystemDirectory() / L"wusa.exe";
-    RunSystemInstaller(work, wusa,
-        {package.u8string(), "/quiet", "/norestart"}, "Windows Management Framework 5.1");
+    const WmfInstallRequest request{wusa, package, work.staging / "wmf-install.log",
+        work.staging / "wmf-service.log"};
+    RunWmfInstaller(work, request);
 }
 
 void CheckWmf3Conflict(FileWork& work, const fs::path& powershell) {
@@ -202,16 +252,43 @@ void CheckWmf3Conflict(FileWork& work, const fs::path& powershell) {
     if (code != 0) throw std::runtime_error(
         "无法确认 Windows 7 的 PowerShell 升级条件，已停止安装。请检查详细日志后重试。");
 }
+bool HasOnlyWin7LegacyEngine(const Platform& platform) {
+    if (platform.target != "windows7") return false;
+    const auto view = platform.arch == "x86_64" ? KEY_WOW64_64KEY : 0;
+    HKEY modern = nullptr;
+    const auto result = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\PowerShell\\3\\PowerShellEngine",
+        0, KEY_QUERY_VALUE | view, &modern);
+    if (modern) RegCloseKey(modern);
+    if (result != ERROR_FILE_NOT_FOUND && result != ERROR_PATH_NOT_FOUND) return false;
+    const DWORD flags = RRF_RT_REG_SZ | (view ? RRF_SUBKEY_WOW6464KEY : 0);
+    wchar_t version[16]{};
+    DWORD bytes = sizeof(version);
+    return RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\PowerShell\\1\\PowerShellEngine",
+        L"PowerShellVersion", flags, nullptr, version, &bytes) == ERROR_SUCCESS && std::wstring(version) == L"2.0";
+}
 }
 
 void CheckWindowsPowerShell(const Platform& platform, FileWork& work) {
     const auto powershell = NativeSystemDirectory() /
         L"WindowsPowerShell/v1.0/powershell.exe";
     const bool available = fs::is_regular_file(powershell);
+    std::string version;
+    unsigned major = 0;
+    bool versionKnown = false;
+    bool versionAtLeast51 = false;
     if (available) {
-        const auto version = ReadVersion(work, powershell);
-        unsigned major = 0;
-        if (AtLeast51(version, major)) {
+        try {
+            version = HasOnlyWin7LegacyEngine(platform) ? "2.0" : ReadVersion(work, powershell);
+            versionAtLeast51 = AtLeast51(version, major);
+            versionKnown = true;
+        } catch (const std::exception&) {
+            if (platform.target != "windows7") throw;
+            work.progress.checks.push_back(
+                "无法读取 PowerShell 版本：将尝试修复 Windows 7 前置组件。");
+        }
+    }
+    if (versionKnown) {
+        if (versionAtLeast51) {
             if (platform.target == "windows7")
                 InstallDotNet(work, UserHome() / L".iyw-claw/cache/prerequisites");
             work.progress.checks.push_back("PowerShell " + version + "：检查通过。");
@@ -222,7 +299,7 @@ void CheckWindowsPowerShell(const Platform& platform, FileWork& work) {
                 " 未达到 5.1；检查系统更新后重试。");
         if (major == 3) CheckWmf3Conflict(work, powershell);
         work.progress.checks.push_back("PowerShell " + version + "：需要补齐 WMF 5.1。");
-    } else if (platform.target != "windows7") {
+    } else if (!available && platform.target != "windows7") {
         throw std::runtime_error("此 Windows 版本缺少 Windows PowerShell；请检查系统组件后重试。");
     }
 
@@ -230,9 +307,15 @@ void CheckWindowsPowerShell(const Platform& platform, FileWork& work) {
     InstallDotNet(work, cache);
     fs::create_directories(cache);
     CheckWindowsManagementFramework(work, cache, platform);
-    const auto installedVersion = ReadVersion(work, powershell);
-    unsigned major = 0;
-    if (!AtLeast51(installedVersion, major))
+    std::string installedVersion;
+    try {
+        installedVersion = ReadVersion(work, powershell);
+    } catch (const std::exception& error) {
+        throw std::runtime_error("Windows 7 前置组件安装完成，但 PowerShell 仍无法正常启动。" +
+            std::string(error.what()));
+    }
+    unsigned installedMajor = 0;
+    if (!AtLeast51(installedVersion, installedMajor))
         throw std::runtime_error("WMF 5.1 安装程序已完成，但 PowerShell 仍为 " +
             installedVersion + "。请重启 Windows 后重试。");
     work.progress.checks.push_back("Windows 7 已补齐 WMF 5.1 与 .NET Framework 前置组件。");

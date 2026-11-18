@@ -1,5 +1,28 @@
 # Win7 统一安装与更新入口
 
+2026-11-18：修复 Win7 初始 PowerShell 版本探测退出非零时直接中止的问题。现在会继续执行
+已校验的 .NET/WMF 5.1 前置组件流程，并在安装后重新验证 PowerShell；非 Win7 系统仍在探测失败时停止。
+WMF 安装在单次管理员授权中临时启用被禁用的 Windows Update 服务，安装结束后恢复原启动类型和运行状态；
+恢复失败会写入本次诊断目录。WUSA 返回 `0x80240037` 时，改用系统 `expand.exe` 解包已校验的 WMF MSU，
+再由 `pkgmgr.exe` 按包内 XML 清单安装全部 CAB（含前置更新），绕过 DISM 在线安装不支持 MSU 的限制；
+解包、Package Manager 返回码及 CBS 日志位置保留在本次诊断目录。若本地 servicing 仍失败，安装停止并报告原始结果，
+不将失败误报为服务禁用。Win7 i5-7400 真机验收仍待执行。
+
+Win7 实机日志 `wmf-expand-output.log` 显示 x64 包的 9 个文件均已解出。随后向导把 XML 文件传给子进程作为工作目录，
+Windows 在创建 `pkgmgr.exe` 进程时返回 267，向导将其汇总为 1603。修正后 `/n:` 接收 XML 路径，工作目录取 XML 与 CAB 所在的文件夹。
+
+后续真机记录中，15:43:29 解包完毕，15:45:44 本地安装返回 `0x800F081F`（CBS 找不到所需源）。
+微软 x86 和 x64 包内 XML 使用 `%configsetroot%`。向导现在逐一核实 CAB 存在，把本地绝对路径写入安装清单副本，保留原包顺序。
+管理员助手在受保护的临时目录复核固定摘要。进度区显示更新搜索、解包和组件写入。仅有注册表明确表明唯一引擎是 PowerShell 2.0 时跳过旧引擎冷启动，安装后的可运行性仍使用真实进程验证。
+
+系统组件返回 3010 或 1641 时，向导登记当前账户的一次性续装任务，尽量提前下载并验证选定主包及必需组件，再弹出“立即重启 / 稍后重启”，默认稍后。下次登录恢复原安装位置和已选版本，重新检查系统与签名，完成后启动原助理。
+预取失败时余下工作留到登录后完成。续装记录只保存安装位置和所需发布元数据。系统源缺失属于安装失败，需根据同一时段的 `CBS.log` 进一步诊断。
+
+2026-11-18：MSVC 14.51 的静态 filesystem 又引入了 Win7 不支持的 `CopyFile2` 导入，
+导致向导在 Win7 加载时提示找不到 `KERNEL32.dll` 入口。Win32 入口现将该导入转接到
+`CopyFileW`，并在打包检查中禁止重新引入 `CopyFile2`。需重建并签名的新包才包含此修复；
+本机未做 Win7 真机启动验收。
+
 2026-11-17：用户明确指定由 `iyw-claw-installer` 处理安装引导和更新。
 
 ## 验收标准
@@ -39,6 +62,7 @@
 沿用现有时钟导入兼容方式，将该入口映射为等价 `CreateFileW` 调用；保留属性、
 文件标志、安全属性、共享方式和模板句柄。打包时禁止出现 `CreateFile2` 系统导入。
 
-来源：PowerShell/PowerShell-Docs `wmf/setup/install-configure.md`，
+来源：PowerShell/PowerShell-Docs `wmf/setup/install-configure.md`；
+Microsoft Support [KB934307](https://support.microsoft.com/help/934307)（MSU 的 CAB/XML 结构和 `pkgmgr.exe /n` 安装方式），
 删除提交 `9fefa4d048b494f6f6f2d2a99315c95b0159d759` 的父版本。
 Win7 真机验收尚未执行，构建及签名验证不等同于系统补装验收。

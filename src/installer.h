@@ -16,7 +16,7 @@ namespace setup {
 namespace fs = std::filesystem;
 constexpr std::uint64_t MiB = 1024 * 1024;
 enum class Phase { Ready, Checking, Resolving, Downloading, Verifying, PresetDownload, Installing, Environment,
-    Finalizing, Complete, Cancelled, Failed };
+    Finalizing, Complete, Cancelled, Failed, RestartRequired };
 constexpr unsigned StageCount = 8;
 struct Platform { std::string target; std::string arch; };
 struct Release {
@@ -41,6 +41,8 @@ struct UpdateRequest {
     unsigned parentPid = 0;
     fs::path readyFile;
     bool workerMode = false;
+    bool resumedFresh = false;
+    bool resumed = false;
 };
 struct PresetComponent{
     std::string id,version,versionId,artifactId,sha256;
@@ -58,6 +60,7 @@ struct Snapshot {
     unsigned completedStages = 0;
     std::array<bool,StageCount> reused{};
     bool cancellable = true;
+    bool restartRegistered = false;
     std::string detail;
     std::string version;
     fs::path destination;

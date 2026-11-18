@@ -77,7 +77,7 @@ def windows():
     if re.search(r"(?:VCRUNTIME|MSVCP|wxmsw).*\.dll", dependencies, re.IGNORECASE):
         raise RuntimeError("Unexpected external GUI or CRT dependency")
     imports = run(dumpbin, "/IMPORTS", executable)
-    for name in ("GetSystemTimePreciseAsFileTime", "ProcessPrng", "CreatePseudoConsole", "CreateFile2"):
+    for name in ("GetSystemTimePreciseAsFileTime", "ProcessPrng", "CreatePseudoConsole", "CreateFile2", "CopyFile2"):
         if name in imports:
             raise RuntimeError(f"Unsupported Win7 import: {name}")
     folder = STAGING / "windows"

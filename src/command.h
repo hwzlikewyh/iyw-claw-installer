@@ -10,6 +10,16 @@ struct Command {
     fs::path directory;
     bool elevated = false;
 };
+struct WmfInstallRequest {
+    fs::path wusa;
+    fs::path package;
+    fs::path installLog;
+    fs::path serviceLog;
+};
 int RunCommand(const Command& command, const std::function<void()>& poll = {});
+int RunWmfInstallerElevated(const WmfInstallRequest& request,
+    const std::function<void()>& poll = {});
+int RunWmfElevatedWorker(const fs::path& session);
+fs::path WmfLiveDirectory(const fs::path& staging);
 std::string ReadOutput(const fs::path& path);
 }

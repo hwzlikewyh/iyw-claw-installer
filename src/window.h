@@ -10,7 +10,8 @@
 
 class SetupWindow : public wxFrame {
 public:
-    explicit SetupWindow(std::optional<setup::UpdateRequest> request = std::nullopt);
+    explicit SetupWindow(std::optional<setup::UpdateRequest> request = std::nullopt,
+        std::optional<setup::fs::path> resumeRoot = std::nullopt);
     bool StartsHidden() const { return silentUpdate_; }
 private:
     void Paint(wxPaintEvent& event);
@@ -41,6 +42,7 @@ private:
     void StartInstall();
     void OnPrimary();
     void OnSecondary();
+    void OfferRestart();
     void Tick(wxTimerEvent& event);
     void CloseWindow(wxCloseEvent& event);
     void Browse();
@@ -97,4 +99,5 @@ private:
     std::optional<setup::UpdateRequest> updateRequest_;
     bool updateMode_ = false;
     bool silentUpdate_ = false;
+    bool resumed_ = false;
 };

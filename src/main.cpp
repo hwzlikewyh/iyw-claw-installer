@@ -19,6 +19,8 @@
 #include <iostream>
 #ifdef _WIN32
 #include "payload.h"
+#include "command.h"
+#include "win7_restart.h"
 #endif
 
 namespace {
@@ -118,6 +120,13 @@ public:
             }catch(const std::exception&){processResult_=1;}
             return true;
         }
+        if(argc==3&&wxString(argv[1])==wxS("--wmf-elevated-worker")) {
+            capabilityMode_=true;
+            try {
+                processResult_=setup::RunWmfElevatedWorker(setup::fs::path(wxString(argv[2]).ToStdWstring()));
+            } catch(const std::exception&) { processResult_=1; }
+            return true;
+        }
         if(argc==2&&wxString(argv[1])==wxS("--capabilities")) {
             std::cout << "{\"protocol\":2,\"payload\":\"app_payload_zip\",\"target\":\"windows\",\"arch\":\"x86_64\","
                 "\"nsis_targets\":[\"windows/x86_64\",\"windows/i686\",\"windows7/x86_64\",\"windows7/i686\"]}" << std::endl;
@@ -138,7 +147,17 @@ public:
         wxInitAllImageHandlers();
         try {
             auto request = ParseUpdateRequest(argc, argv);
+#ifdef _WIN32
+            std::optional<setup::fs::path> resumeRoot;
+            if (argc == 2 && wxString(argv[1]) == wxS("--resume-after-restart")) {
+                const auto session = setup::LoadRestartSession();
+                resumeRoot = session.destination;
+                request = session.selection;
+            }
+            auto* window = new SetupWindow(std::move(request), resumeRoot);
+#else
             auto* window = new SetupWindow(std::move(request));
+#endif
             SetTopWindow(window);
             if (!window->StartsHidden()) window->Show();
             return true;

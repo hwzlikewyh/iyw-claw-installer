@@ -14,4 +14,21 @@ extern "C" HANDLE WINAPI YuanCompatibleCreateFile2(LPCWSTR name, DWORD access, D
     return CreateFileW(name, access, share, parameters ? parameters->lpSecurityAttributes : nullptr,
         disposition, flags, parameters ? parameters->hTemplateFile : nullptr);
 }
+
+extern "C" HRESULT WINAPI YuanCompatibleCopyFile2(PCWSTR source, PCWSTR destination,
+    COPYFILE2_EXTENDED_PARAMETERS* parameters) {
+    const DWORD flags = parameters ? parameters->dwCopyFlags : 0;
+    if ((parameters && parameters->dwSize != sizeof(*parameters)) ||
+        (flags & ~COPY_FILE_FAIL_IF_EXISTS) != 0 ||
+        (parameters && (parameters->pfCancel || parameters->pProgressRoutine ||
+            parameters->pvCallbackContext))) {
+        SetLastError(ERROR_NOT_SUPPORTED);
+        return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+    }
+    if (!CopyFileW(source, destination, (flags & COPY_FILE_FAIL_IF_EXISTS) != 0)) {
+        const DWORD error = GetLastError();
+        return HRESULT_FROM_WIN32(error ? error : ERROR_GEN_FAILURE);
+    }
+    return S_OK;
+}
 #endif

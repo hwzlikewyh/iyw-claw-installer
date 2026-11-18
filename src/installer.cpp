@@ -8,6 +8,8 @@
 #define NOMINMAX
 #include <windows.h>
 #include "payload.h"
+#include "command.h"
+#include "win7_restart.h"
 #endif
 namespace setup {
 namespace {
@@ -48,8 +50,13 @@ void StageCachedPackage(const UpdateRequest& request, const Release& release, Fi
     work.progress.reused[static_cast<unsigned>(StageIndex(Phase::Downloading))] = true;
     work.progress.events.push_back("复用应用更新缓存，SHA-256 与发布者签名重新校验通过。");
 }
+}
+#ifdef _WIN32
+#include "win7_restart.inc"
+#endif
+namespace {
 void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
-    work.updateMode = request.has_value();
+    work.updateMode = request && !request->resumedFresh;
     work.silentUpdate = request && request->silent;
     work.acceptedHandoff = request && request->acceptedHandoff;
     if (request) {
@@ -92,7 +99,15 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
         if (request && !request->packageCache.empty()) {
             BeginStage(work, Phase::Downloading);
             work.progress.detail = "正在复用已校验的更新缓存";
-            StageCachedPackage(*request, release, work);
+            try { StageCachedPackage(*request, release, work); }
+            catch (const std::exception&) {
+                if (!request->resumed || work.job.IsCancelled()) throw;
+                work.progress.events.push_back("续装缓存未通过校验，正在重新下载所选版本。");
+                work.packageLock.reset();
+                fs::remove(work.staging / "setup.exe");
+                DownloadPackage(release, work);
+                VerifyDownload(release, work);
+            }
         } else {
             DownloadPackage(release,work);VerifyDownload(release,work);
         }
@@ -158,6 +173,20 @@ void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
     FileWork work{*this, {}, result, std::chrono::steady_clock::now(), {}};
     try {
         work.staging = CreateStaging(); Execute(work, request);
+#ifdef _WIN32
+        if (!request || !request->workerMode) ClearRestartSession(result.destination);
+    } catch (const SystemRestart& restart) {
+        if (request && request->parentPid) ReportUpdateFailure(*request, restart.what());
+        result.detail = restart.what();
+        result.events.push_back(result.detail);
+        try { PrepareRestart(work, request); }
+        catch (const std::exception& error) { result.events.push_back(error.what()); }
+        result.detail = restart.what();
+        result.phase = Phase::RestartRequired;
+        result.cancellable = false;
+        result.elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - work.started).count();
+        SaveFailure(work.staging, result);
+#endif
     } catch (const std::exception& error) {
         try { FinishDeployment(work, false); } catch (const std::exception& rollback) {
             result.events.push_back(std::string("应用恢复失败，保留现场：") + rollback.what());
@@ -172,7 +201,7 @@ void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
         result.events.push_back(result.detail); SaveFailure(work.staging, result);
         work.retainedFiles.clear();
         work.installLock.reset();
-        if (request && !request->workerMode && (!request->parentPid || work.parentExited) && !work.installerStarted) {
+        if (request && !request->workerMode && !request->resumed && (!request->parentPid || work.parentExited) && !work.installerStarted) {
             try { LaunchExistingForUpdate(result.destination); }
             catch (const std::exception& restart) {
                 result.events.push_back(std::string("更新未启动，重新打开旧版本失败：") + restart.what());

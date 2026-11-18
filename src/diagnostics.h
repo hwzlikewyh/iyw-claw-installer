@@ -24,6 +24,9 @@ inline const std::array<const char*, 3>* Match(const std::string& detail) {
         {"退出码：1223", "本次管理员授权已取消。", "重新安装时允许系统的管理员授权请求。"},
         {"管理员授权", "本次管理员授权未完成。", "重新安装时允许系统的管理员授权请求。"},
         {"退出码：1618", "另一个安装任务正在运行。", "等待其他安装任务结束，再重试本次安装。"},
+        {"错误 1058", "Windows 服务被禁用，系统组件安装无法启动。", "运行 services.msc，检查 Windows Modules Installer (TrustedInstaller) 与 Windows Update (wuauserv) 的服务设置；若由组织策略禁用，请联系管理员恢复后重试。"},
+        {"0x800f081f", "Windows 组件服务找不到所需安装源（0x800F081F）。", "请复制故障机 %WINDIR%\\Logs\\CBS\\CBS.log 中本次安装时段的记录，以确认缺少哪个包或组件。"},
+        {"0x80240037", "Windows Update 不支持此更新搜索操作。", "向导已自动解包并通过 Package Manager 本地安装；若仍失败，请复制诊断信息并附上 CBS 日志，不需要手动启用 Windows Update 服务。"},
         {"win32_error=5", "Windows 拒绝了应用目录的文件操作。", "退出占用安装目录的程序后重试；必要时选择有写入权限的安装位置。"},
         {"access is denied", "Windows 拒绝了文件或进程操作。", "检查安装位置权限，并关闭占用该目录的程序后重试。"},
         {"空间不足", "安装所需的磁盘空间不足。", "清理目标盘和系统临时目录所在磁盘的空间后重试。"},
@@ -41,6 +44,8 @@ inline std::string Reason(const Snapshot& state) {
     return rule ? (*rule)[1] : state.detail;
 }
 inline std::string Advice(const Snapshot& state) {
+    if (state.phase == Phase::RestartRequired) return state.restartRegistered ?
+        "保存工作后选择重启。下次登录此账户时向导会继续安装。" : "请重启电脑并手动打开安装向导继续。";
     const auto rule = Match(state.detail);
     return rule ? (*rule)[2] : "查看安装详情，按提示处理后重试；需要协助时请复制诊断信息反馈。";
 }

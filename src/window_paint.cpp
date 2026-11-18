@@ -52,6 +52,7 @@ wxString SetupWindow::PhaseTitle()const{
     switch(snapshot_.phase){
     case setup::Phase::Complete:return wxS("一切就绪，开始使用。");
     case setup::Phase::Cancelled:return wxS("已取消本次安装");
+    case setup::Phase::RestartRequired:return wxS("重启电脑后继续安装");
     case setup::Phase::Failed:
         if(setup::diagnostics::Lower(snapshot_.detail).find("需要重启")!=std::string::npos)
             return wxS("重启电脑后即可继续。");
@@ -71,7 +72,8 @@ void SetupWindow::PaintResult(wxGraphicsContext& g){
     ui::Text(g,{PhaseTitle(),{Left,147},26,ui::Ink,true});
     const auto subtitle=success?wxS("原助理已经准备好，开始你的下一件事。"):
         cancelled?wxS("下载已停止，可以稍后重新开始。 "):
-        restart?wxS("系统组件已准备好，重启电脑后再次运行即可继续。"):
+        restart?(snapshot_.restartRegistered?wxS("下次登录此账户后，向导会自动继续安装。"):
+            wxS("重启后请手动打开向导继续安装。")):
         wxS("查看下面的原因，然后返回设置重试。");
     ui::Text(g,{subtitle,{Left,195},12,ui::Muted});
     ui::Rounded(g,{Left,242,Right-Left,218},ui::Ground);
@@ -84,6 +86,7 @@ void SetupWindow::PaintResult(wxGraphicsContext& g){
     if(reason.length()>81)reason=reason.Left(78)+wxS("…");
     for(std::size_t line=0;line<3&&line*27<reason.length();++line)
         ui::Text(g,{reason.Mid(line*27,27),{538,322+line*21.0},12,colour});
+    if (snapshot_.phase == setup::Phase::RestartRequired) return;
     if (!success && !cancelled) {
         const auto advice=wxString::FromUTF8(setup::diagnostics::Advice(snapshot_));
         for(std::size_t line=0;line<3&&line*27<advice.length();++line)

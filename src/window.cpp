@@ -21,11 +21,11 @@ namespace {
 constexpr int InitialWidth = 960;
 constexpr int InitialHeight = 640;
 }
-SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request)
+SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request, std::optional<setup::fs::path> resumeRoot)
     : wxFrame(nullptr, wxID_ANY, wxS("原助理 · 安装向导"), wxDefaultPosition, wxDefaultSize,
         wxBORDER_NONE | wxSYSTEM_MENU | wxMINIMIZE_BOX), timer_(this), animation_(this),
         updateRequest_(std::move(request)), updateMode_(updateRequest_.has_value()),
-        silentUpdate_(updateRequest_ && updateRequest_->silent) {
+        silentUpdate_(updateRequest_ && updateRequest_->silent), resumed_(resumeRoot.has_value()) {
     SetClientSize(FromDIP(wxSize(InitialWidth, InitialHeight)));
     canvas_ = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     canvas_->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -46,13 +46,14 @@ SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request)
     BindChrome();
     LayoutControls();
     if (updateRequest_) path_->SetValue(wxString::FromUTF8(updateRequest_->destination.u8string()));
+    if (resumeRoot) path_->SetValue(wxString::FromUTF8(resumeRoot->u8string()));
     if (silentUpdate_) path_->Hide();
     path_->SetInsertionPoint(0);
     Centre(); primary_->SetFocus();
     StartMotion();
     if (silentUpdate_) {
         CallAfter([this] { StartInstall(); });
-    } else if (updateRequest_) {
+    } else if (updateRequest_ || resumeRoot) {
         configuring_ = true;
         CallAfter([this] { StartInstall(); });
     }
@@ -172,6 +173,9 @@ void SetupWindow::UpdateControls() {
         (configuring_ ? wxS("下载并安装  →") : wxS("开始安装  →")) : wxS("返回设置并重试"));
     secondary_->SetLabel(Running() ? (!snapshot_.cancellable ? wxS("正在完成安装") : cancelling_ ? wxS("取消中…") : wxS("取消安装")) :
         snapshot_.phase == setup::Phase::Complete ? wxS("完成") : ready && configuring_ ? wxS("上一步") : wxS("退出"));
+    if (snapshot_.phase == setup::Phase::RestartRequired) {
+        primary_->SetLabel(wxS("重启选项")); secondary_->SetLabel(wxS("稍后重启"));
+    }
     LayoutControls();
     primary_->Refresh(); secondary_->Refresh(); canvas_->Refresh();
 }

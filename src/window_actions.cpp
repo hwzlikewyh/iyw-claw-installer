@@ -73,6 +73,7 @@ void SetupWindow::StartInstall() {
 }
 void SetupWindow::OnPrimary() {
     if (Running()) return;
+    if (snapshot_.phase == setup::Phase::RestartRequired) { OfferRestart(); return; }
     if (snapshot_.phase == setup::Phase::Complete) {
         try {
             auto launch = snapshot_;
@@ -112,9 +113,13 @@ void SetupWindow::Tick(wxTimerEvent&) {
     liveSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now() - started_).count();
     if (!Running()) {
         timer_.Stop(); job_.Join(); cancelling_ = false;
+        if (snapshot_.phase == setup::Phase::RestartRequired) {
+            silentUpdate_ = false; closing_ = false; Show(); Raise(); UpdateControls();
+            OfferRestart(); return;
+        }
         if (closing_) { Destroy(); return; }
-        if (updateMode_ && snapshot_.phase == setup::Phase::Complete) {
-            try { setup::LaunchInstalled(snapshot_, true); Destroy(); return; }
+        if ((updateMode_ || resumed_) && snapshot_.phase == setup::Phase::Complete) {
+            try { setup::LaunchInstalled(snapshot_, updateRequest_ && !updateRequest_->resumedFresh); Destroy(); return; }
             catch (const std::exception& error) {
                 inlineMessage_ = ToText(error.what());
                 silentUpdate_=false;
@@ -127,6 +132,20 @@ void SetupWindow::Tick(wxTimerEvent&) {
         BeginTransition(); UpdateControls(); primary_->SetFocus();
     }
     canvas_->Refresh(false);
+}
+void SetupWindow::OfferRestart() {
+#ifdef _WIN32
+    const auto continuation = snapshot_.restartRegistered ? wxS("下次登录此账户时，向导会继续安装。") :
+        wxS("未能登记自动续装。重启后请手动打开原助理安装向导。");
+    wxMessageDialog dialog(this, wxString::FromUTF8(snapshot_.detail) + wxS("\n\n") + continuation +
+        wxS("\n立即重启前请先保存其他程序中的工作。"), wxS("原助理安装需要重启电脑"),
+        wxYES_NO | wxNO_DEFAULT | wxICON_INFORMATION);
+    dialog.SetYesNoLabels(wxS("立即重启"), wxS("稍后重启"));
+    if (dialog.ShowModal() != wxID_YES) { canvas_->Refresh(false); return; }
+    if (!wxShutdown(wxSHUTDOWN_REBOOT))
+        wxMessageBox(wxS("Windows 未接受重启请求。请保存工作并从开始菜单重启电脑。"),
+            wxS("请手动重启"), wxOK | wxICON_INFORMATION, this);
+#endif
 }
 void SetupWindow::CloseWindow(wxCloseEvent& event) {
     if(Running())snapshot_=job_.Read();

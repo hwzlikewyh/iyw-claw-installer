@@ -1,5 +1,8 @@
 #include "update_retry.h"
 #include "diagnostics.h"
+#include "win7_restart.h"
+#include "wmf_sources.h"
+#include <fstream>
 #include <stdexcept>
 #include <iostream>
 
@@ -41,11 +44,42 @@ void VerifyDiagnostics() {
     Require(setup::diagnostics::Reason(state) == "应用目录仍被进程占用，暂时无法替换。", "Missing directory lock advice");
     state.detail = "更新调用方不是当前安装的原助理。";
     Require(setup::diagnostics::Advice(state).find("返回设置并重试") != std::string::npos, "Missing retry advice");
+    state.detail = "Windows Management Framework 5.1 安装失败：Windows 服务被禁用（错误 1058）。";
+    Require(setup::diagnostics::Reason(state).find("服务被禁用") != std::string::npos,
+        "Missing disabled-service diagnosis");
+    Require(setup::diagnostics::Advice(state).find("TrustedInstaller") != std::string::npos,
+        "Missing Windows servicing service advice");
+    state.detail = "Windows Management Framework 5.1 安装失败：Windows Update Agent 返回不支持操作错误（0x80240037）。";
+    Require(setup::diagnostics::Reason(state).find("不支持") != std::string::npos,
+        "Missing Windows Update unsupported-operation diagnosis");
+    Require(setup::diagnostics::Advice(state).find("Package Manager 本地安装") != std::string::npos,
+        "Missing automatic local servicing fallback advice");
+    Require(setup::diagnostics::Advice(state).find("手动启用 Windows Update") != std::string::npos,
+        "Unsupported-operation advice still asks users to change service settings");
+    state.detail = "本地安装 0x800F081F，先前 WUSA 返回 0x80240037";
+    Require(setup::diagnostics::Reason(state).find("安装源") != std::string::npos, "Lost final CBS error");
+    Require(setup::RequiresSystemRestart(3010) && setup::RequiresSystemRestart(1641) &&
+        !setup::RequiresSystemRestart(0x800f081f) && !setup::RequiresSystemRestart(1603) && !setup::RequiresSystemRestart(0),
+        "Servicing failures and successful reboots must be distinguished");
     Require(setup::diagnostics::Report(state).find("原助理安装诊断") == 0, "Report is not UTF-8 Chinese text");
+}
+void VerifyLocalSources(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    const std::string xml{std::istreambuf_iterator<char>(input), {}};
+    const auto local = setup::BindWmfSources(xml, path.parent_path());
+    Require(local.find("%configsetroot%") == std::string::npos && local != xml, "CAB paths not bound");
+    Require(local.find("KB3191566") != std::string::npos, "Missing WMF package");
+    Require(local.find("&amp;") != std::string::npos || path.parent_path().u8string().find('&') == std::string::npos,
+        "XML source directory was not escaped");
+    try { setup::BindWmfSources("<source location=\"%configsetroot%\\missing.cab\" />", path.parent_path()); }
+    catch (const std::runtime_error&) { return; }
+    throw std::runtime_error("Missing CAB accepted");
 }
 }
 
-int main() {
-    try { VerifyRetryPreservesSelectedRelease(); VerifyDiagnostics(); std::cout << "Update retry and UTF-8 diagnostics checks passed\n"; }
+int main(int argc, char** argv) {
+    try { VerifyRetryPreservesSelectedRelease(); VerifyDiagnostics();
+        for (int index = 1; index < argc; ++index) VerifyLocalSources(std::filesystem::absolute(argv[index]));
+        std::cout << "Update retry, reboot and WMF diagnostics checks passed\n"; }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
