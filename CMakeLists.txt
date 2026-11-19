@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.5" CACHE STRING "Minimum supported macOS version")
 endif()
-project(IywClawInstaller VERSION 0.2.10 LANGUAGES CXX)
+project(IywClawInstaller VERSION 0.2.11 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -53,7 +53,7 @@ if(WIN32)
   target_compile_definitions(iyw-installer PRIVATE SODIUM_STATIC LIBARCHIVE_STATIC)
   target_link_libraries(iyw-installer PRIVATE "${PAYLOAD_DEPS}/sodium.lib"
     "${PAYLOAD_DEPS}/archive/libarchive/Release/archive.lib" "${PAYLOAD_DEPS}/zlib/Release/zlibstatic.lib")
-  target_sources(iyw-installer PRIVATE src/http_windows.cpp src/platform_windows.cpp src/command_windows.cpp
+  target_sources(iyw-installer PRIVATE src/http_windows.cpp src/platform_windows.cpp src/existing_install_windows.cpp src/command_windows.cpp
     src/verify_windows.cpp src/install_windows.cpp src/payload_verify.cpp src/payload_archive.cpp
     src/payload_transaction.cpp src/payload_environment.cpp src/payload_process.cpp
     src/payload_webview.cpp src/payload_registration.cpp src/payload_elevation.cpp src/payload_elevated_worker.cpp)

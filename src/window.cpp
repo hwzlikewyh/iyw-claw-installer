@@ -47,6 +47,7 @@ SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request, std::optio
     LayoutControls();
     if (updateRequest_) path_->SetValue(wxString::FromUTF8(updateRequest_->destination.u8string()));
     if (resumeRoot) path_->SetValue(wxString::FromUTF8(resumeRoot->u8string()));
+    CheckExistingInstallation();
     if (silentUpdate_) path_->Hide();
     path_->SetInsertionPoint(0);
     Centre(); primary_->SetFocus();
@@ -82,6 +83,7 @@ void SetupWindow::CreateControls() {
     diagnosticText_->Hide();
 }
 void SetupWindow::BindEvents() {
+    path_->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { CheckExistingInstallation(); });
     primary_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OnPrimary(); });
     secondary_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OnSecondary(); });
     browse_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { Browse(); });
@@ -170,7 +172,8 @@ void SetupWindow::UpdateControls() {
     primary_->Show(!Running()); primary_->Enable(!Running());
     secondary_->Enable(!cancelling_ && (!Running() || snapshot_.cancellable));
     primary_->SetLabel(snapshot_.phase == setup::Phase::Complete ? wxS("启动原助理") : ready ?
-        (configuring_ ? wxS("下载并安装  →") : wxS("开始安装  →")) : wxS("返回设置并重试"));
+        (!installedVersion_.empty() ? (configuring_ ? wxS("检查并更新  →") : wxS("更新原助理  →")) :
+            (configuring_ ? wxS("下载并安装  →") : wxS("开始安装  →"))) : wxS("返回设置并重试"));
     secondary_->SetLabel(Running() ? (!snapshot_.cancellable ? wxS("正在完成安装") : cancelling_ ? wxS("取消中…") : wxS("取消安装")) :
         snapshot_.phase == setup::Phase::Complete ? wxS("完成") : ready && configuring_ ? wxS("上一步") : wxS("退出"));
     if (snapshot_.phase == setup::Phase::RestartRequired) {

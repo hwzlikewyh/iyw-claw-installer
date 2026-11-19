@@ -18,19 +18,19 @@ void SetupWindow::PaintContent(wxGraphicsContext& g){
     else if(Running())PaintProgress(g);else PaintResult(g);
 }
 void SetupWindow::PaintReady(wxGraphicsContext& g){
-    ui::Text(g,{wxS("准备好，开启新可能"),{Left,123},12,ui::Accent,true});
+    ui::Text(g,{installedVersion_.empty()?wxString(wxS("准备好，开启新可能")):wxS("已安装原助理 ")+installedVersion_,{Left,123},12,ui::Accent,true});
     ui::Text(g,{wxS("让想法"),{Left,163},42,ui::Ink,true});
     ui::Text(g,{wxS("即刻发生。"),{Left,218},42,wxColour("#b2ccff"),true});
     ui::Text(g,{wxS("把原助理带到桌面，让 AI 与你一起完成。"),{Left,293},13,ui::Muted});
-    ui::Text(g,{wxS("下载稳定版，自动准备所需环境。"),{Left,321},13,ui::Muted});
+    ui::Text(g,{installedVersion_.empty()?wxString(wxS("下载稳定版，自动准备所需环境。")):wxString(wxS("将沿用原安装位置更新，保留已有数据。")),{Left,321},13,ui::Muted});
     g.SetPen(wxPen(ui::Line,1));g.StrokeLine(Left,355,Right,355);
     ui::Text(g,{wxS("支持升级、重装与版本回退"),{Left,502},11,ui::Muted});
     ui::Text(g,{wxS("安装前可以选择位置"),{Left,527},11,ui::Muted});
 }
 void SetupWindow::PaintConfigure(wxGraphicsContext& g){
-    ui::Text(g,{wxS("安装设置"),{Left,111},12,ui::Accent,true});
-    ui::Text(g,{wxS("给原助理一个位置"),{Left,145},26,ui::Ink,true});
-    ui::Text(g,{wxS("应用与环境会在后台准备。"),{Left,191},13,ui::Muted});
+    ui::Text(g,{installedVersion_.empty()?wxString(wxS("安装设置")):wxString(wxS("检测到已有安装")),{Left,111},12,ui::Accent,true});
+    ui::Text(g,{installedVersion_.empty()?wxString(wxS("给原助理一个位置")):wxString(wxS("更新你的原助理")),{Left,145},26,ui::Ink,true});
+    ui::Text(g,{installedVersion_.empty()?wxString(wxS("应用与环境会在后台准备。")):wxS("已安装版本 ")+installedVersion_+wxS("，将沿用以下位置。"),{Left,191},13,ui::Muted});
     ui::Text(g,{wxS("安装位置"),{Left,224},12,ui::Ink,true});
     ui::Rounded(g,{Left,250,Right-Left,48},ui::Ground);
     g.SetPen(wxPen(wxColour("#3e424e"),1));g.StrokeLine(793,263,793,285);

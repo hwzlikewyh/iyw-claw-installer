@@ -47,6 +47,7 @@ private:
     void CloseWindow(wxCloseEvent& event);
     void Browse();
     void UpdateControls();
+    void CheckExistingInstallation();
     void ToggleDiagnostics();
     void OpenLog();
     void CopyDiagnostics();
@@ -85,6 +86,7 @@ private:
     bool configuring_ = false;
     wxString system_;
     wxString inlineMessage_;
+    wxString installedVersion_;
     wxPoint dragOffset_;
     std::chrono::steady_clock::time_point lastFrame_;
     std::chrono::steady_clock::time_point transitionClock_;

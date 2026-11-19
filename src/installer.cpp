@@ -10,6 +10,7 @@
 #include "payload.h"
 #include "command.h"
 #include "win7_restart.h"
+#include "existing_install.h"
 #endif
 namespace setup {
 namespace {
@@ -70,6 +71,11 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     }
     BeginStage(work, Phase::Checking);
     ValidateRoot(work.progress.destination, work.progress);
+#ifdef _WIN32
+    const auto installedVersion = ExistingInstallVersion(work.progress.destination);
+    if (!installedVersion.empty())
+        work.progress.events.push_back("检测到已安装原助理 " + installedVersion + "；沿用原安装位置。");
+#endif
     const auto platform = CurrentPlatform();
     CheckSystem(work); CheckEnvironment(work);
     BeginStage(work, Phase::Resolving);

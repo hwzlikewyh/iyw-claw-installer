@@ -2,6 +2,7 @@
 #include "release.h"
 #include "diagnostics.h"
 #include "update_retry.h"
+#include "existing_install.h"
 #include <wx/clipbrd.h>
 #include <wx/dataobj.h>
 #include <wx/filename.h>
@@ -13,6 +14,16 @@
 namespace {
 constexpr int ProgressRefreshMs = 100;
 wxString ToText(const std::string& value) { return wxString::FromUTF8(value); }
+}
+void SetupWindow::CheckExistingInstallation() {
+#ifdef _WIN32
+    try {
+        const auto selected = setup::fs::u8path(path_->GetValue().ToUTF8().data());
+        installedVersion_ = wxString::FromUTF8(setup::ExistingInstallVersion(selected));
+    } catch (const std::exception&) { installedVersion_.clear(); }
+    if (!installedVersion_.empty() && !updateRequest_) configuring_ = true;
+#endif
+    if (close_) UpdateControls();
 }
 void SetupWindow::Browse() {
     wxDirDialog dialog(this, wxS("选择原助理安装位置"), path_->GetValue(), wxDD_DEFAULT_STYLE);
@@ -50,7 +61,14 @@ void SetupWindow::CopyDiagnostics() {
 }
 void SetupWindow::StartInstall() {
     try {
-        const auto folder = setup::fs::u8path(path_->GetValue().ToUTF8().data());
+        auto folder = setup::fs::u8path(path_->GetValue().ToUTF8().data());
+#ifdef _WIN32
+        const auto existing = setup::NormalizeExistingInstallRoot(folder);
+        if (!existing.empty()) {
+            folder = existing;
+            path_->ChangeValue(wxString::FromUTF8(folder.u8string()));
+        }
+#endif
         if (folder.empty() || !folder.is_absolute()) {
             inlineMessage_=wxS("请选择完整的文件夹路径，例如 D:\\原助理。");canvas_->Refresh();
             path_->SetFocus(); return;

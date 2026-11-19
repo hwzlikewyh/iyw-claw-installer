@@ -1,6 +1,7 @@
 #include "windows_support.h"
 #include "command.h"
 #include "payload.h"
+#include "existing_install.h"
 #ifdef _WIN32
 #include <shellapi.h>
 #include <shlobj.h>
@@ -27,12 +28,8 @@ Platform CurrentPlatform() {
     return {version.dwMajorVersion < 10 ? "windows7" : "windows", arch};
 }
 fs::path DefaultInstallRoot() {
-    std::array<wchar_t, 32768> stored{}; DWORD bytes = static_cast<DWORD>(sizeof(stored));
-    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\iywclaw\\iyw-claw", L"InstallRoot",
-        RRF_RT_REG_SZ, nullptr, stored.data(), &bytes) == ERROR_SUCCESS && stored[0]) {
-        fs::path root(stored.data());
-        if (root.is_absolute()) return root;
-    }
+    const auto installed = FindExistingInstallRoot();
+    if (!installed.empty()) return installed;
     std::array<wchar_t, MAX_PATH> local{};
     if (FAILED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, local.data())))
         throw std::runtime_error("无法读取当前用户应用目录。");
