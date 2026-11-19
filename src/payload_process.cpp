@@ -121,6 +121,14 @@ void ReportUpdateFailure(const UpdateRequest& request, const std::string& detail
 void AwaitUpdateParent(const UpdateRequest& request) {
     auto parent = UpdateParent(request);
     WriteDurableJSON(request.readyFile,{{"pid",GetCurrentProcessId()},{"protocol",2}});
-    if(WaitForSingleObject(parent.get(),60000)!=WAIT_OBJECT_0)throw std::runtime_error("等待原助理退出超时，更新未开始。");
+    constexpr DWORD HandoffTimeoutMs = 60000;
+    const auto wait = WaitForSingleObject(parent.get(), HandoffTimeoutMs);
+    if (wait == WAIT_OBJECT_0) return;
+    if (wait != WAIT_TIMEOUT) throw std::runtime_error("无法确认旧原助理的退出状态。");
+    if (!request.silent && request.release.packageKind == PayloadKind) {
+        StopInstalledProcesses(request.destination);
+        if (WaitForSingleObject(parent.get(), 0) == WAIT_OBJECT_0) return;
+    }
+    throw std::runtime_error("等待原助理退出超时，更新未开始。");
 }
 }

@@ -13,6 +13,63 @@ Json ReadJSON(const fs::path& path) {
     std::ifstream file(path);return Json::parse(file);
 }
 fs::path Journal(const FileWork& work){return work.progress.destination/"staging/direct-install.json";}
+std::wstring TransactionId() {
+    GUID id{};
+    wchar_t text[40]{};
+    if (FAILED(CoCreateGuid(&id)) || !StringFromGUID2(id, text, 40))
+        throw std::runtime_error("无法创建安装事务标识。");
+    return text;
+}
+bool LegacyAppComplete(const fs::path& app) {
+    for (const auto* name : {"iyw-claw.exe", "iyw-environment.exe"}) {
+        const auto binary = app / name;
+        RequirePlainPath(binary);
+        if (!fs::is_regular_file(binary) || !fs::file_size(binary)) return false;
+    }
+    return true;
+}
+void RecoverLegacyInstall(FileWork& work) {
+    const auto& root = work.progress.destination;
+    const auto marker = root / LegacyPendingMarker;
+    RequirePlainPath(marker);
+    if (!fs::exists(marker)) return;
+    if (!fs::is_regular_file(marker) || fs::exists(Journal(work)))
+        throw std::runtime_error("旧安装事务记录异常或与新事务冲突，已保留记录与备份。");
+
+    const auto app = root / "app";
+    const auto backup = marker.parent_path() / "installer-app-backup";
+    RequirePlainPath(app);
+    RequirePlainPath(backup);
+    const bool hasBackup = fs::exists(backup);
+    if (hasBackup) {
+        if (!LegacyAppComplete(backup))
+            throw std::runtime_error("旧安装备份缺少主程序或环境助手，已保留应用与备份。");
+        for (const auto& entry : fs::recursive_directory_iterator(backup)) RequirePlainPath(entry.path());
+        VerifySignature(backup / "iyw-claw.exe");
+        VerifyEnvironmentBinary(backup / "iyw-environment.exe");
+    }
+    // NSIS 在备份前写标记。没有备份时保留完整的旧 app，隔离首次安装留下的残件。
+    if (fs::exists(app) && !fs::is_directory(app))
+        throw std::runtime_error("旧应用路径不是目录，已保留安装现场。");
+    const bool preserve = fs::exists(app) && (hasBackup || !LegacyAppComplete(app));
+    BeginStage(work, Phase::Installing);
+    StopInstalledProcesses(root);
+    fs::path partial;
+    if (preserve) {
+        partial = marker.parent_path() / (L"incomplete-app-" + TransactionId());
+        fs::rename(app, partial);
+        work.progress.events.push_back("已保留上次安装的应用文件：" + partial.u8string());
+    }
+    if (hasBackup) {
+        try { fs::rename(backup, app); }
+        catch (const fs::filesystem_error&) {
+            if (!partial.empty()) fs::rename(partial, app);
+            throw;
+        }
+    }
+    fs::remove(marker);
+    work.progress.events.push_back(hasBackup ? "已从旧安装备份恢复原助理。" : "已清理旧安装事务标记。");
+}
 void ValidateCommitted(FileWork& work) {
     const auto app=work.progress.destination/"app";
     if(FileVersion(app/"iyw-claw.exe")!=work.progress.version)
@@ -106,9 +163,7 @@ void LoadRecovery(FileWork& work) {
 }
 void WriteDurableJSON(const fs::path& path,const Json& value) {
     RequirePlainPath(path);fs::create_directories(path.parent_path());
-    GUID id{};wchar_t textId[40]{};
-    if(FAILED(CoCreateGuid(&id))||!StringFromGUID2(id,textId,40))throw std::runtime_error("无法创建事务写入标识。");
-    const auto temporary=fs::path(path.wstring()+L"."+textId+L".new");RequirePlainPath(temporary);
+    const auto temporary=fs::path(path.wstring()+L"."+TransactionId()+L".new");RequirePlainPath(temporary);
     const auto text=value.dump();
     Handle file(CreateFileW(temporary.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr));
     DWORD count=0;
@@ -134,10 +189,10 @@ void LockDirectInstall(FileWork& work) {
     Handle lock(CreateMutexW(nullptr,FALSE,L"Global\\IywClawInstallerTransactionV1"));
     if(!lock||GetLastError()==ERROR_ALREADY_EXISTS)throw std::runtime_error("另一个安装或卸载正在进行，请稍后重试。");
     work.installLock=std::shared_ptr<void>(lock.release(),HandleClose{});
-    if(fs::exists(work.progress.destination/"staging/installer-app-pending-v1"))throw std::runtime_error("旧安装器仍有未完成事务，请先完成旧安装恢复。");
 }
 void RecoverDirectInstall(FileWork& work) {
     LockDirectInstall(work);
+    RecoverLegacyInstall(work);
     if(!fs::exists(Journal(work)))return;
     // 恢复使用独立上下文；失败时本次安装的异常清理不能覆盖旧事务。
     Snapshot previous=work.progress;

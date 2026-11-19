@@ -88,7 +88,8 @@ void InstallUnifiedInstaller(const fs::path& root) {
 }
 void VerifyEnvironmentBinary(const fs::path& helper){VerifySignature(helper);}
 bool ReuseApplication(const Release& release,FileWork& work){
-    if(work.directPayload&&fs::exists(work.progress.destination/"staging/direct-install.json"))return false;
+    if(work.directPayload&&(fs::exists(work.progress.destination/"staging/direct-install.json")||
+                           fs::exists(work.progress.destination/LegacyPendingMarker)))return false;
     const auto executable=work.progress.destination/"app/iyw-claw.exe";
     const auto helper=EnvironmentHelper(work.progress.destination);
     if(!fs::is_regular_file(executable)||!fs::is_regular_file(helper)||FileVersion(executable)!=release.version)return false;

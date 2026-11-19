@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 namespace setup {
 inline constexpr char PayloadKind[] = "app_payload_zip";
+inline constexpr char LegacyPendingMarker[] = "staging/installer-app-pending-v1";
 inline constexpr std::uint64_t MaxPayloadBytes = 4ULL * 1024 * MiB;
 inline constexpr unsigned MaxPayloadFiles = 100000;
 void VerifyPayload(const Release& release, FileWork& work);
