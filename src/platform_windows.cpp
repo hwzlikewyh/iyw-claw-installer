@@ -16,16 +16,15 @@ Platform CurrentPlatform() {
     const auto query = reinterpret_cast<GetVersion>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"));
     RTL_OSVERSIONINFOW version{}; version.dwOSVersionInfoSize = sizeof(version);
     if (!query || query(&version) < 0) throw std::runtime_error("无法识别 Windows 版本。");
-    if (version.dwMajorVersion < 6 || (version.dwMajorVersion == 6 && version.dwMinorVersion < 1))
-        throw std::runtime_error("此安装向导需要 Windows 7 SP1 或更新系统。");
-    if(version.dwMajorVersion==6&&version.dwMinorVersion==1&&version.dwBuildNumber<7601)
-        throw std::runtime_error("Windows 7 需要安装 Service Pack 1 后再继续。");
-    if(version.dwMajorVersion==6&&version.dwMinorVersion>1)
-        throw std::runtime_error("当前分发未定义 Windows 8/8.1 目标，请使用 Windows 7 SP1、10 或 11。");
+    constexpr DWORD Windows7Major = 6, Windows7Minor = 1, Windows10Major = 10;
+    if (version.dwMajorVersion == Windows7Major && version.dwMinorVersion == Windows7Minor)
+        throw std::runtime_error("暂不支持 Win7 系统。");
+    if (version.dwMajorVersion < Windows10Major)
+        throw std::runtime_error("此安装向导需要 Windows 10 或更新系统。");
     SYSTEM_INFO system{}; GetNativeSystemInfo(&system);
     const auto arch = system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? "x86_64" :
         system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64 ? "aarch64" : "i686";
-    return {version.dwMajorVersion < 10 ? "windows7" : "windows", arch};
+    return {"windows", arch};
 }
 fs::path DefaultInstallRoot() {
     const auto installed = FindExistingInstallRoot();

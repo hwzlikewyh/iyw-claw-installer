@@ -11,13 +11,14 @@ import struct
 import subprocess
 import sys
 import tarfile
+import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ROOT / "packages"
 STAGING = ROOT / "build-package"
 APP_NAME = "原助理安装向导"
-VERSION = "0.2.12"
+VERSION = "0.2.13"
 WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 
@@ -49,7 +50,7 @@ def notices(destination):
         "原助理在线安装向导\n\n运行向导后选择安装位置，按实际进度下载最新稳定版和预置环境。\n"
         "安装完成后点击“启动原助理”。已安装且健康的组件会复用。\n"
         "Windows 发布包的签名状态以发布页 SHA256SUMS 和系统签名验证为准。\n"
-        "Windows: Win7 SP1/10/11；Win7 需 TLS 1.2 和 PowerShell 5.1。\n"
+        "Windows：支持 Windows 10、11，暂不支持 Win7 系统。\n"
         "macOS: 13.5+，Intel/Apple Silicon 通用包；首次打开受 Gatekeeper 管理。\n"
         "Linux: Ubuntu 22.04+ / Debian 12+；DEB 自动声明 GTK/curl/archive/sodium/WebKitGTK 依赖。\n"
         "源码及构建记录：https://github.com/hwzlikewyh/iyw-claw-installer\n",
@@ -62,6 +63,16 @@ def zip_folder(source, output):
         for path in sorted(source.rglob("*")):
             if path.is_file():
                 archive.write(path, path.relative_to(source))
+
+
+def extract_zip(source, destination):
+    base = destination.resolve()
+    with zipfile.ZipFile(source) as archive:
+        for member in archive.infolist():
+            target = (base / member.filename).resolve()
+            if target != base and base not in target.parents:
+                raise RuntimeError(f"Unsafe ZIP path: {member.filename}")
+            archive.extract(member, base)
 
 
 def windows():
@@ -86,6 +97,22 @@ def windows():
     notices(folder / "licenses")
     shutil.copy2(executable, PACKAGES / "YuanAssistant-Setup-windows.exe")
     zip_folder(folder, PACKAGES / "YuanAssistant-Setup-windows.zip")
+
+
+def finalize_windows():
+    executable = PACKAGES / "YuanAssistant-Setup-windows.exe"
+    archive = PACKAGES / "YuanAssistant-Setup-windows.zip"
+    if not executable.is_file() or not archive.is_file():
+        raise RuntimeError("Windows signing inputs are incomplete")
+
+    with tempfile.TemporaryDirectory(prefix="iyw-windows-package-") as directory:
+        extracted = Path(directory)
+        extract_zip(archive, extracted)
+        embedded = sorted(extracted.rglob("*.exe"))
+        if len(embedded) != 1:
+            raise RuntimeError("Windows ZIP must contain exactly one EXE")
+        shutil.copy2(executable, embedded[0])
+        zip_folder(extracted, archive)
 
 
 def macos():
@@ -168,10 +195,18 @@ def checksums():
 def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
-    parser.add_argument("target", choices=("windows", "macos", "linux"))
+    parser.add_argument(
+        "target", choices=("windows", "finalize-windows", "macos", "linux")
+    )
     options = parser.parse_args()
     PACKAGES.mkdir(exist_ok=True)
-    {"windows": windows, "macos": macos, "linux": linux}[options.target]()
+    builders = {
+        "windows": windows,
+        "finalize-windows": finalize_windows,
+        "macos": macos,
+        "linux": linux,
+    }
+    builders[options.target]()
     checksums()
 
 

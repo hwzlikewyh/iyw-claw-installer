@@ -92,6 +92,19 @@ std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) 
         throw std::runtime_error("统一更新缓存或安装目录无效。");
     return request;
 }
+#ifdef _WIN32
+bool CanStartInstallation(const std::optional<setup::UpdateRequest>& request) {
+    try {
+        setup::CurrentPlatform();
+        return true;
+    } catch (const std::exception& error) {
+        if (request && request->parentPid) setup::ReportUpdateFailure(*request, error.what());
+        if (!request || !request->silent)
+            wxMessageBox(wxString::FromUTF8(error.what()), wxS("原助理安装向导"), wxOK | wxICON_WARNING);
+        return false;
+    }
+}
+#endif
 }
 
 class InstallerApp : public wxApp {
@@ -129,7 +142,7 @@ public:
         }
         if(argc==2&&wxString(argv[1])==wxS("--capabilities")) {
             std::cout << "{\"protocol\":2,\"payload\":\"app_payload_zip\",\"target\":\"windows\",\"arch\":\"x86_64\","
-                "\"nsis_targets\":[\"windows/x86_64\",\"windows/i686\",\"windows7/x86_64\",\"windows7/i686\"]}" << std::endl;
+                "\"nsis_targets\":[\"windows/x86_64\",\"windows/i686\"]}" << std::endl;
             capabilityMode_=true;
             return true;
         }
@@ -140,6 +153,10 @@ public:
             return false;
         }
 #endif
+        return OpenWizard();
+    }
+private:
+    bool OpenWizard() {
         SetAppName(wxS("原助理安装向导"));
         SetAppDisplayName(wxS("原助理安装向导"));
         instance_=std::make_unique<wxSingleInstanceChecker>("yuan-assistant-setup-"+wxGetUserId());
@@ -148,6 +165,7 @@ public:
         try {
             auto request = ParseUpdateRequest(argc, argv);
 #ifdef _WIN32
+            if (!CanStartInstallation(request)) return false;
             std::optional<setup::fs::path> resumeRoot;
             if (argc == 2 && wxString(argv[1]) == wxS("--resume-after-restart")) {
                 const auto session = setup::LoadRestartSession();

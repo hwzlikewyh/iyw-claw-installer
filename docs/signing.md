@@ -11,6 +11,18 @@
 环境变量：`IYW_CLAW_SIGN_MODE=signtool`、`IYW_CLAW_SIGN_REQUIRED=1`、
 `IYW_CLAW_SIGN_THUMBPRINT=<指纹>`。无人值守时沿用项目的 `IYW_CLAW_SAFENET_PIN` Secret。
 
+### Windows 发布流水线
+
+`.github/workflows/build.yml` 先在 GitHub 托管 runner 上构建并上传一天有效的
+`windows-signing-input` 中间包，再在 `[self-hosted, Windows, X64, iyw-signing]`
+签名机上调用固定提交的 `iyw-claw` 签名脚本。签名机需要配置仓库变量
+`WINDOWS_SIGN_THUMBPRINT` 和 Secret `IYW_CLAW_SAFENET_PIN`。
+
+签名 job 会签名独立 EXE，把相同字节写回 ZIP，重新生成 `SHA256SUMS.txt`，并检查
+发布者指纹、RFC 3161 时间戳、ZIP 内外 EXE 一致性和每个摘要。只有该检查通过后，
+才上传长期使用的 `windows-universal` 最终包。中间包不能作为发布下载入口。
+签名机沿用现有本地代理 `127.0.0.1:7890` 访问 GitHub 和 DigiCert 时间戳服务。
+
 本次 v0.1.0 实际签名验证结果：
 
 - Authenticode 状态 `Valid`，发布者指纹匹配。

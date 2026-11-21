@@ -4,6 +4,8 @@ C++17 + wxWidgets 3.2 原生安装入口。Windows 对外一个 `原助理安装
 入口采用 32 位构建，可在 32/64 位 Windows 启动，并按原生系统与架构选择 Fusion 制品。
 产品名称统一为“原助理”。
 
+0.2.13 统一 Windows 正式签名发布链路，补充安装器发布者元数据，并改进跨平台解包失败诊断。
+
 0.2.12 支持在 Windows 直接安装时恢复旧安装器中断的事务。向导会校验旧备份、保留未完成的应用文件并继续安装。
 前台应用更新等待旧进程退出 60 秒后，会结束目标安装目录中的旧进程并继续切换。
 
@@ -80,10 +82,8 @@ Windows：Visual Studio C++ Build Tools、CMake、wxWidgets 3.2 源码。
 ```
 
 默认构建 Win32 统一入口；`-Architecture x64` 可构建专用 x64 入口。
-已检测 Windows 7 SP1 的 TLS 1.2；缺少 PowerShell 5.1 或其 .NET 前置组件时，
-安装向导会下载微软官方签名包，校验后按本机架构补齐。系统要求重启时会暂停，
-重启后重新运行向导即可继续。WebView2 由正式安装包处理。
-Win7/ARM64/32 位系统仍需实机验收，缺少精确平台制品时明确失败，不退回其他系统的包。
+当前支持 Windows 10、11。Windows 7（含 SP1）打开安装包会提示“暂不支持 Win7 系统。”，确认后退出。
+Windows ARM64 和 32 位系统仍需实机验收，缺少精确平台制品时明确失败，不退回其他系统的包。
 
 macOS/Linux：开发机准备 CMake、C++17、pkg-config、libcurl、libarchive、libsodium、
 wxWidgets 源码（Linux 还需 GTK 3 开发包），运行：
@@ -98,7 +98,7 @@ Linux 检查 glibc 2.35+、GTK 3、WebKitGTK 4.1；从签名 AppImage 解包运�
 系统库缺失时提供具体包名；Node、Git、uv 等受管组件由环境助手补齐。
 
 当前已实测 Windows 11 安装复用；macOS 通用版及 Linux x64/ARM64 已完成原生编译、
-打包和欢迎窗口启动检查。Win7、更多系统版本，以及 macOS/Linux 的完整安装、升级、
+打包和欢迎窗口启动检查。更多受支持的 Windows 版本，以及 macOS/Linux 的完整安装、升级、
 回退与环境补齐仍需实机验收，不能将构建成功等同于全部兼容性验收。
 相邻 `iyw-claw` 环境助手已移除无条件排除 Open Computer Use 的过滤；
 这项修复需随新版正式应用发布后，旧 Linux 制品才会获得相应行为。
@@ -108,5 +108,6 @@ Linux 检查 glibc 2.35+、GTK 3、WebKitGTK 4.1；从签名 AppImage 解包运�
 v0.1.0 的 Windows 下载文件已完成正式 Authenticode 签名和 DigiCert 时间戳验证。
 macOS 应用和 DMG 已完成 Developer ID 签名及安全时间戳验证，Apple 公证尚未完成。
 Windows 新程序仍可能因 SmartScreen 下载信誉不足而提示确认，正式签名不保证立即免提示。
+Windows 构建先生成短期签名输入包，再由 `iyw-signing` 自托管签名机完成正式签名、时间戳和摘要校验；只有校验通过的 `windows-universal` 才作为最终产物上传。
 当前提供构建候选；依赖许可证随打包目录附带。
 签名流程与验证记录见 [签名说明](docs/signing.md)。

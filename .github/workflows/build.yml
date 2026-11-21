@@ -34,9 +34,74 @@ jobs:
           if ($app.ExitCode -ne 0) { throw 'Installer exited with an error' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          name: windows-signing-input
+          path: packages/*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+  windows-sign:
+    name: Sign Windows installer
+    needs: windows
+    if: ${{ needs.windows.result == 'success' }}
+    runs-on: [self-hosted, Windows, X64, iyw-signing]
+    timeout-minutes: 30
+    env:
+      IYW_CLAW_SIGN_MODE: signtool
+      IYW_CLAW_SIGN_REQUIRED: "1"
+      IYW_CLAW_SIGN_THUMBPRINT: ${{ vars.WINDOWS_SIGN_THUMBPRINT }}
+      IYW_CLAW_SAFENET_PIN: ${{ secrets.IYW_CLAW_SAFENET_PIN }}
+      HTTP_PROXY: http://127.0.0.1:7890
+      HTTPS_PROXY: http://127.0.0.1:7890
+      NO_PROXY: localhost,127.0.0.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout pinned signing tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: hwzlikewyh/iyw-claw
+          ref: 9097411e72552efceef63bf5d21b322326d3fa8d
+          path: .signing/iyw-claw
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            src-tauri/scripts/sign-staged-windows.mjs
+            src-tauri/scripts/sign-windows.mjs
+            src-tauri/scripts/sign-windows-token.mjs
+            src-tauri/scripts/sign-windows-token.ps1
+            src-tauri/scripts/staged-signature-verification.mjs
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: windows-signing-input
+          path: packages
+      - name: Sign Windows executable
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:IYW_CLAW_SIGN_THUMBPRINT)) {
+            throw 'WINDOWS_SIGN_THUMBPRINT is not configured.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:IYW_CLAW_SAFENET_PIN)) {
+            throw 'IYW_CLAW_SAFENET_PIN is not configured.'
+          }
+          $file = (Resolve-Path -LiteralPath 'packages\YuanAssistant-Setup-windows.exe').Path
+          node .signing\iyw-claw\src-tauri\scripts\sign-staged-windows.mjs $file
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Authenticode signing failed.' }
+      - name: Rebuild signed ZIP and checksums
+        shell: pwsh
+        run: python scripts/package.py finalize-windows
+      - name: Verify final Windows package
+        shell: pwsh
+        run: ./scripts/verify-windows-package.ps1 -PackageRoot packages -ExpectedThumbprint $env:IYW_CLAW_SIGN_THUMBPRINT
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
           name: windows-universal
           path: packages/*
           if-no-files-found: error
+          compression-level: 0
   macos:
     runs-on: macos-15
     timeout-minutes: 50
