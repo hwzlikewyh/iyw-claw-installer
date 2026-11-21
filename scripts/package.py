@@ -49,7 +49,7 @@ def notices(destination):
         "原助理在线安装向导\n\n运行向导后选择安装位置，按实际进度下载最新稳定版和预置环境。\n"
         "安装完成后点击“启动原助理”。已安装且健康的组件会复用。\n"
         "Windows 发布包的签名状态以发布页 SHA256SUMS 和系统签名验证为准。\n"
-        "Windows: Win7 SP1/10/11；Win7 需 TLS 1.2 和 PowerShell 5.1。\n"
+        "Windows：支持 Windows 10、11，暂不支持 Win7 系统。\n"
         "macOS: 13.5+，Intel/Apple Silicon 通用包；首次打开受 Gatekeeper 管理。\n"
         "Linux: Ubuntu 22.04+ / Debian 12+；DEB 自动声明 GTK/curl/archive/sodium/WebKitGTK 依赖。\n"
         "源码及构建记录：https://github.com/hwzlikewyh/iyw-claw-installer\n",

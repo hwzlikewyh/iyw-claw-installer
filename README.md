@@ -80,10 +80,8 @@ Windows：Visual Studio C++ Build Tools、CMake、wxWidgets 3.2 源码。
 ```
 
 默认构建 Win32 统一入口；`-Architecture x64` 可构建专用 x64 入口。
-已检测 Windows 7 SP1 的 TLS 1.2；缺少 PowerShell 5.1 或其 .NET 前置组件时，
-安装向导会下载微软官方签名包，校验后按本机架构补齐。系统要求重启时会暂停，
-重启后重新运行向导即可继续。WebView2 由正式安装包处理。
-Win7/ARM64/32 位系统仍需实机验收，缺少精确平台制品时明确失败，不退回其他系统的包。
+当前支持 Windows 10、11。Windows 7（含 SP1）打开安装包会提示“暂不支持 Win7 系统。”，确认后退出。
+Windows ARM64 和 32 位系统仍需实机验收，缺少精确平台制品时明确失败，不退回其他系统的包。
 
 macOS/Linux：开发机准备 CMake、C++17、pkg-config、libcurl、libarchive、libsodium、
 wxWidgets 源码（Linux 还需 GTK 3 开发包），运行：
@@ -98,7 +96,7 @@ Linux 检查 glibc 2.35+、GTK 3、WebKitGTK 4.1；从签名 AppImage 解包运�
 系统库缺失时提供具体包名；Node、Git、uv 等受管组件由环境助手补齐。
 
 当前已实测 Windows 11 安装复用；macOS 通用版及 Linux x64/ARM64 已完成原生编译、
-打包和欢迎窗口启动检查。Win7、更多系统版本，以及 macOS/Linux 的完整安装、升级、
+打包和欢迎窗口启动检查。更多受支持的 Windows 版本，以及 macOS/Linux 的完整安装、升级、
 回退与环境补齐仍需实机验收，不能将构建成功等同于全部兼容性验收。
 相邻 `iyw-claw` 环境助手已移除无条件排除 Open Computer Use 的过滤；
 这项修复需随新版正式应用发布后，旧 Linux 制品才会获得相应行为。

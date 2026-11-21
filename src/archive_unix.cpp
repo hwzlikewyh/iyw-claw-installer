@@ -12,7 +12,7 @@ fs::path SafeRelative(const char* value){
     for(const auto& part:path)if(part=="..")throw std::runtime_error("安装包含越界路径。");
     return path;
 }
-void ValidateEntry(archive_entry* entry,const fs::path& root){
+fs::path ValidateEntry(archive_entry* entry,const fs::path& root){
     const auto relative=SafeRelative(archive_entry_pathname(entry));
     const auto type=archive_entry_filetype(entry);
     if(type!=AE_IFREG&&type!=AE_IFDIR&&type!=AE_IFLNK)throw std::runtime_error("安装包包含特殊设备文件。");
@@ -26,10 +26,13 @@ void ValidateEntry(archive_entry* entry,const fs::path& root){
     }
     const auto absolute=root/relative;archive_entry_set_pathname(entry,absolute.c_str());
     archive_entry_set_perm(entry,archive_entry_perm(entry)&0777);
+    return relative;
 }
 }
 void ExtractApplication(FileWork& work){
-    const auto root=work.staging/"unpacked";fs::create_directory(root);
+    // macOS 的临时目录可能经过 /var 链接，只解析向导自己创建的暂存目录。
+    const auto root=fs::canonical(work.staging)/"unpacked";
+    fs::create_directory(root);
     std::unique_ptr<archive,decltype(&archive_read_free)> reader(archive_read_new(),archive_read_free);
     std::unique_ptr<archive,decltype(&archive_write_free)> writer(archive_write_disk_new(),archive_write_free);
     archive_read_support_filter_gzip(reader.get());archive_read_support_format_tar(reader.get());
@@ -43,8 +46,12 @@ void ExtractApplication(FileWork& work){
         if(++files>100000)throw std::runtime_error("安装包文件数量异常。");
         const auto size=archive_entry_size(entry);
         if(size<0||static_cast<std::uint64_t>(size)>MaxExpanded-total)throw std::runtime_error("安装包解压体积异常。");
-        total+=size;ValidateEntry(entry,root);
-        if(archive_write_header(writer.get(),entry)<ARCHIVE_OK)throw std::runtime_error("无法创建应用文件。");
+        total+=size;
+        const auto relative=ValidateEntry(entry,root);
+        if(archive_write_header(writer.get(),entry)<ARCHIVE_OK){
+            const char* detail=archive_error_string(writer.get());
+            throw std::runtime_error("无法创建应用文件「"+relative.string()+"」："+(detail?detail:"解包器未返回原因。"));
+        }
         const void* data=nullptr;size_t count=0;la_int64_t offset=0;
         int block;
         while((block=archive_read_data_block(reader.get(),&data,&count,&offset))==ARCHIVE_OK)
