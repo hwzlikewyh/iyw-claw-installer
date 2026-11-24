@@ -5,8 +5,8 @@ IDI_APP_ICON ICON "icon.ico"
 IYW_WEBVIEW2_X64 RCDATA "MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 #endif
 1 VERSIONINFO
-FILEVERSION 0,2,15,0
-PRODUCTVERSION 0,2,15,0
+FILEVERSION 0,2,16,0
+PRODUCTVERSION 0,2,16,0
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_APP
 BEGIN
@@ -18,7 +18,7 @@ BEGIN
    VALUE "ProductName", "原助理\0"
     VALUE "CompanyName", "厦门市虹约产品设计有限公司\0"
     VALUE "OriginalFilename", "原助理安装向导.exe\0"
-   VALUE "FileVersion", "0.2.15\0"
+   VALUE "FileVersion", "0.2.16\0"
   END
  END
  BLOCK "VarFileInfo"
