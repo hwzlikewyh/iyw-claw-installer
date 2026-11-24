@@ -33,15 +33,19 @@ void PrepareDirectEnvironment(const Release& release, FileWork& work, bool befor
     if(identity.at("distributionTarget")!="windows"||identity.at("target")!="x86_64-pc-windows-msvc"||identity.value("installerProtocol",0)!=2)
         throw std::runtime_error("环境助手系统或架构不匹配。");
     work.progress.logPath=work.staging/"environment-prepare.log";
-    const std::vector<std::string> args{"install","--phase","prepare","--app-version",release.version,"--initialize-defaults","--progress-file",(work.staging/"environment-progress.ini").u8string()};
+    const auto progressFile = work.staging / "environment-progress.ini";
+    const std::vector<std::string> args{"install","--phase","prepare","--app-version",release.version,"--progress-file",progressFile.u8string()};
     work.progress.detail="快速核对已有环境，只准备缺失或变更组件";work.job.Publish(work.progress);
-    if(RunCommand({helper,args,work.progress.logPath,0},[&]{PollEnvironmentProgress(work);})!=0)
-        throw std::runtime_error("运行环境准备失败，请查看环境准备日志。");
-    // 使用此次助手进程的回执，避免其他环境操作覆盖全局 pending 指针。
-    const auto log=ReadOutput(work.progress.logPath);
-    const auto marker=log.rfind("prepared-transaction:");
-    if(marker==std::string::npos)throw std::runtime_error("环境助手缺少准备回执。");
-    const auto id=log.substr(marker+21,32);
+    const auto code=RunCommand({helper,args,work.progress.logPath,0},[&]{PollEnvironmentProgress(work);});
+    if(code!=0)
+        throw std::runtime_error("运行环境准备失败，退出码 "+std::to_string(code)+"。详见本次安装目录中的 environment-prepare.log.stderr。");
+    // 与正式安装器共用本次助手的进度回执，避免读取全局 pending 指针。
+    std::ifstream receipt(progressFile);
+    std::string id, line;
+    while(std::getline(receipt,line)){
+        if(!line.empty()&&line.back()=='\r')line.pop_back();
+        if(line.rfind("Transaction=",0)==0)id=line.substr(sizeof("Transaction=")-1);
+    }
     if(id.size()!=32||id.find_first_not_of("0123456789abcdef")!=std::string::npos)throw std::runtime_error("环境事务编号无效。");
     const auto prepared=UserHome()/".iyw-claw/staging/environment"/id/"prepared.json";
     if(fs::file_size(prepared)>64*MiB)throw std::runtime_error("环境事务清单过大。");

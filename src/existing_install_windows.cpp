@@ -33,6 +33,14 @@ fs::path NormalizeExistingInstallRoot(const fs::path& candidate) {
         fs::is_regular_file(root / "iyw-claw.exe", error)) return root.parent_path();
     return {};
 }
+fs::path SelectedInstallRoot(const fs::path& candidate) {
+    if (!candidate.is_absolute()) return candidate;
+    const auto existing = NormalizeExistingInstallRoot(candidate);
+    if (!existing.empty()) return existing;
+    auto root = candidate.lexically_normal();
+    if (root.filename().empty() && root != root.root_path()) root = root.parent_path();
+    return root.filename() == L"原助理" ? root : root / L"原助理";
+}
 fs::path FindExistingInstallRoot() {
     constexpr const wchar_t* install = L"Software\\iywclaw\\iyw-claw";
     constexpr const wchar_t* uninstall = L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\原助理";

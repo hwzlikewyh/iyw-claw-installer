@@ -28,7 +28,11 @@ void SetupWindow::CheckExistingInstallation() {
 void SetupWindow::Browse() {
     wxDirDialog dialog(this, wxS("选择原助理安装位置"), path_->GetValue(), wxDD_DEFAULT_STYLE);
     if (dialog.ShowModal() == wxID_OK) {
-        path_->SetValue(dialog.GetPath()); path_->SetInsertionPoint(0);
+        auto selected = dialog.GetPath();
+#ifdef _WIN32
+        selected = wxString(setup::SelectedInstallRoot(setup::fs::path(selected.ToStdWstring())).wstring());
+#endif
+        path_->SetValue(selected); path_->SetInsertionPoint(0);
     }
 }
 void SetupWindow::ToggleDiagnostics() {
@@ -63,9 +67,9 @@ void SetupWindow::StartInstall() {
     try {
         auto folder = setup::fs::u8path(path_->GetValue().ToUTF8().data());
 #ifdef _WIN32
-        const auto existing = setup::NormalizeExistingInstallRoot(folder);
-        if (!existing.empty()) {
-            folder = existing;
+        const auto selected = updateRequest_ ? setup::NormalizeExistingInstallRoot(folder) : setup::SelectedInstallRoot(folder);
+        if (!selected.empty()) {
+            folder = selected;
             path_->ChangeValue(wxString::FromUTF8(folder.u8string()));
         }
 #endif

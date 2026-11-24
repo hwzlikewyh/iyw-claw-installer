@@ -15,7 +15,7 @@ struct Address { std::wstring host, path; INTERNET_PORT port = INTERNET_DEFAULT_
     throw std::runtime_error(std::string(action) + "，请检查网络或代理后重试。系统错误：" + std::to_string(GetLastError()));
 }
 std::wstring Wide(const std::string& text) { return fs::u8path(text).wstring(); }
-Address ParseURL(const std::wstring& url) {
+Address ParseURL(const std::wstring& url, bool webViewDownload) {
     URL_COMPONENTS parts{}; parts.dwStructSize = sizeof(parts);
     parts.dwHostNameLength = parts.dwUrlPathLength = parts.dwExtraInfoLength = DWORD(-1);
     parts.dwUserNameLength = parts.dwPasswordLength = DWORD(-1);
@@ -26,6 +26,11 @@ Address ParseURL(const std::wstring& url) {
         std::wstring(parts.lpszUrlPath, parts.dwUrlPathLength), parts.nPort};
     if (parts.dwExtraInfoLength) result.path.append(parts.lpszExtraInfo, parts.dwExtraInfoLength);
     const auto& host = result.host;
+    if (webViewDownload) {
+        if (host != L"go.microsoft.com" && host != L"msedge.sf.dl.delivery.mp.microsoft.com")
+            throw std::runtime_error("WebView2 下载重定向到了非预期的域名。");
+        return result;
+    }
     const std::wstring tosSuffix = L".volces.com";
     const bool tos = host.size() > tosSuffix.size() && host.compare(host.size() - tosSuffix.size(), tosSuffix.size(), tosSuffix) == 0 &&
         host.find(L".tos-") != std::wstring::npos;
@@ -54,7 +59,7 @@ Http OpenRequest(void* connection, const Address& address,const std::wstring& ex
     DWORD policy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
     if (!WinHttpSetOption(request.get(), WINHTTP_OPTION_REDIRECT_POLICY, &policy, sizeof(policy)))
         NetworkError("无法设置下载重定向策略");
-    const std::wstring headers = L"Cache-Control: no-cache\r\nX-IYW-Installation-ID: yuan-assistant-installer\r\n"+extra+
+    const std::wstring headers = L"Cache-Control: no-cache\r\n"+extra+
         (body?L"Content-Type: application/json\r\n":L"");
     const DWORD length=body?static_cast<DWORD>(body->size()):0;
     if (!WinHttpSendRequest(request.get(), headers.c_str(), DWORD(-1),body?const_cast<char*>(body->data()):nullptr,length,length,0) ||
@@ -83,16 +88,17 @@ void ReadBody(void* request, const Receive& receive, InstallJob& job) {
 }
 }
 bool TransferHttps(const std::string& url, const Receive& receive, InstallJob& job,
-    const std::pair<std::uint64_t,std::uint64_t>* range,const std::string* body=nullptr) {
+    const std::pair<std::uint64_t,std::uint64_t>* range,const std::string* body=nullptr, bool webViewDownload=false) {
     auto session = OpenSession();
     auto current = Wide(url);
     constexpr unsigned RedirectLimit = 5;
     for (unsigned attempt = 0; attempt <= RedirectLimit; ++attempt) {
         CheckCancel(job);
-        const auto address = ParseURL(current);
+        const auto address = ParseURL(current,webViewDownload);
         Http connection(WinHttpConnect(session.get(), address.host.c_str(), address.port, 0));
         if (!connection) NetworkError("无法连接安装服务");
-        const auto extra=range?L"Range: bytes="+std::to_wstring(range->first)+L"-"+std::to_wstring(range->second)+L"\r\n":L"";
+        std::wstring extra=webViewDownload?L"":L"X-IYW-Installation-ID: yuan-assistant-installer\r\n";
+        if(range)extra+=L"Range: bytes="+std::to_wstring(range->first)+L"-"+std::to_wstring(range->second)+L"\r\n";
         auto request = OpenRequest(connection.get(), address,extra,body);
         DWORD status = 0, size = sizeof(status);
         if (!WinHttpQueryHeaders(request.get(), WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
@@ -114,6 +120,9 @@ bool TransferHttps(const std::string& url, const Receive& receive, InstallJob& j
     throw std::runtime_error("安装包下载重定向次数过多。");
 }
 void ReadHttps(const std::string& url,const Receive& receive,InstallJob& job){TransferHttps(url,receive,job,nullptr);}
+void ReadWebViewStandalone(const Receive& receive,InstallJob& job){
+    TransferHttps("https://go.microsoft.com/fwlink/?linkid=2124701",receive,job,nullptr,nullptr,true);
+}
 void PostHttps(const std::string& url,const std::string& body,const Receive& receive,InstallJob& job){TransferHttps(url,receive,job,nullptr,&body);}
 bool ReadHttpsRange(const std::string& url,const std::pair<std::uint64_t,std::uint64_t>& range,const Receive& receive,InstallJob& job){
     return TransferHttps(url,receive,job,&range);

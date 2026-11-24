@@ -11,16 +11,37 @@
 #include <vector>
 #include "win7_prerequisites.inc"
 namespace setup {
+const OSVERSIONINFOEXW& NativeWindowsVersion() {
+    static const auto version=[] {
+        using QueryVersion = LONG(WINAPI*)(OSVERSIONINFOW*);
+        const auto query=reinterpret_cast<QueryVersion>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"),"RtlGetVersion"));
+        OSVERSIONINFOEXW info{};info.dwOSVersionInfoSize=sizeof(info);
+        if(!query || query(reinterpret_cast<OSVERSIONINFOW*>(&info))<0)throw std::runtime_error("无法识别 Windows 版本。");
+        return info;
+    }();
+    return version;
+}
+DWORD WindowsProductEdition() {
+    const auto& v=NativeWindowsVersion();
+    DWORD edition=PRODUCT_UNDEFINED;
+    GetProductInfo(v.dwMajorVersion,v.dwMinorVersion,v.wServicePackMajor,v.wServicePackMinor,&edition);
+    return edition;
+}
 Platform CurrentPlatform() {
-    using GetVersion = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
-    const auto query = reinterpret_cast<GetVersion>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"));
-    RTL_OSVERSIONINFOW version{}; version.dwOSVersionInfoSize = sizeof(version);
-    if (!query || query(&version) < 0) throw std::runtime_error("无法识别 Windows 版本。");
+    const auto& version=NativeWindowsVersion();
     constexpr DWORD Windows7Major = 6, Windows7Minor = 1, Windows10Major = 10;
     if (version.dwMajorVersion == Windows7Major && version.dwMinorVersion == Windows7Minor)
         throw std::runtime_error("暂不支持 Win7 系统。");
     if (version.dwMajorVersion < Windows10Major)
         throw std::runtime_error("此安装向导需要 Windows 10 或更新系统。");
+    using QueryMachine=BOOL(WINAPI*)(HANDLE,USHORT*,USHORT*);
+    const auto queryMachine=reinterpret_cast<QueryMachine>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"),"IsWow64Process2"));
+    USHORT processMachine=0,nativeMachine=0;
+    if(queryMachine && queryMachine(GetCurrentProcess(),&processMachine,&nativeMachine)) {
+        if(nativeMachine==IMAGE_FILE_MACHINE_ARM64)return {"windows","aarch64"};
+        if(nativeMachine==IMAGE_FILE_MACHINE_AMD64)return {"windows","x86_64"};
+        if(nativeMachine==IMAGE_FILE_MACHINE_I386)return {"windows","i686"};
+    }
     SYSTEM_INFO system{}; GetNativeSystemInfo(&system);
     const auto arch = system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? "x86_64" :
         system.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64 ? "aarch64" : "i686";
@@ -32,7 +53,7 @@ fs::path DefaultInstallRoot() {
     std::array<wchar_t, MAX_PATH> local{};
     if (FAILED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, local.data())))
         throw std::runtime_error("无法读取当前用户应用目录。");
-    return fs::path(local.data()) / "iyw-claw";
+    return fs::path(local.data()) / L"原助理";
 }
 fs::path UserHome(){
     wchar_t path[MAX_PATH]{};
@@ -102,7 +123,6 @@ bool ReuseApplication(const Release& release,FileWork& work){
             if(identity.value("installerProtocol",0)!=2)return false;
             for(const auto* path:{"resources/bundle/index.html","xinghe-resources/runtime.json","native-share/config.json","native-share/register.ps1","native-share/share-resources.ps1","native-share/IywAssistant.ShareTarget.msix","installer/webview2-setup.exe"})
                 if(!fs::is_regular_file(work.progress.destination/"app"/fs::u8path(path)))return false;
-            EnsureWebView(work);
         }
         work.retainedFiles.emplace_back(appLock.release(),HandleClose{});
         work.retainedFiles.emplace_back(helperLock.release(),HandleClose{});
@@ -112,7 +132,10 @@ bool ReuseApplication(const Release& release,FileWork& work){
 }
 void CheckSystem(FileWork& work){
     const auto platform=CurrentPlatform();
-    work.progress.checks.push_back("系统："+platform.target+" / "+platform.arch);
+    const auto& os=NativeWindowsVersion();
+    work.progress.checks.push_back("系统："+platform.target+" / "+platform.arch+"，版本 "+
+        std::to_string(os.dwMajorVersion)+"."+std::to_string(os.dwMinorVersion)+"."+std::to_string(os.dwBuildNumber)+
+        (os.wProductType==VER_NT_WORKSTATION?"，工作站":"，服务器")+"，SKU "+std::to_string(WindowsProductEdition()));
     CheckWindowsPowerShell(platform,work);
     work.progress.checks.push_back(platform.target=="windows7"?"WebView2：使用 Win7 安装包内固定 109 运行库。":
         "WebView2：安装时快速检测，缺失时补齐微软运行库。");

@@ -122,6 +122,8 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
 #ifdef _WIN32
     if(work.needsElevation) {
         InstallDirectElevated(release,work,request?&*request:nullptr);
+        // 提权可能使用另一个账户，交还控制权后核对实际启动应用的用户环境。
+        EnsureWebView(work);
         return;
     }
     if(work.directPayload&&!pendingDirect) {

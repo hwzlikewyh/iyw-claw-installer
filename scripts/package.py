@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ROOT / "packages"
 STAGING = ROOT / "build-package"
 APP_NAME = "原助理安装向导"
-VERSION = "0.2.14"
+VERSION = "0.2.15"
 WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 

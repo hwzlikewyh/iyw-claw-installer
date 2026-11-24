@@ -5,6 +5,7 @@ namespace setup {
 #ifdef _WIN32
 fs::path FindExistingInstallRoot();
 fs::path NormalizeExistingInstallRoot(const fs::path& candidate);
+fs::path SelectedInstallRoot(const fs::path& candidate);
 std::string ExistingInstallVersion(const fs::path& root);
 #endif
 }
