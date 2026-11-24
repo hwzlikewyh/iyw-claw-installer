@@ -7,6 +7,17 @@
 #include <stdexcept>
 namespace setup {
 namespace {
+constexpr std::uint64_t MaxPackageBytes = 1024 * MiB;
+
+std::uint64_t PackageLimit(const nlohmann::json& data) {
+    const auto found=data.find("max_artifact_bytes");
+    // 旧后台未下发业务上限时仍允许已有主包，保留安全上限。
+    if(found==data.end())return MaxPackageBytes;
+    if(!found->is_number_integer() || *found<=0)
+        throw std::runtime_error("Fusion 安装包大小上限无效。");
+    return std::min(found->get<std::uint64_t>(),MaxPackageBytes);
+}
+
 std::array<unsigned, 3> Version(const std::string& value) {
     std::array<unsigned, 3> parts{};
     std::istringstream stream(value);
@@ -49,6 +60,7 @@ Release ParseRelease(const std::string& body) {
                payload.at("url")!=std::string(FusionBase)+"/app-updates/artifacts/"+artifactId+"/download")
                 throw std::runtime_error("应用载荷发布身份不匹配。");
             Release release{data.at("version"),payload.at("url"),payload.at("sha256"),payload.at("size"),payload.at("signature"),"app_payload_zip",data.at("release_id")};
+            if(release.size>PackageLimit(data))throw std::runtime_error("应用载荷超过后台配置的下载上限。");
             std::string error;
             if(!ValidateRequestedRelease(release,error)||release.signature.empty())throw std::runtime_error("应用载荷元数据无效："+error);
             std::transform(release.sha256.begin(),release.sha256.end(),release.sha256.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
@@ -57,8 +69,7 @@ Release ParseRelease(const std::string& body) {
         Release release{data.at("version"), data.at("url"), data.at("sha256"), 0};
         Version(release.version);
         const auto size = data.at("size").get<std::int64_t>();
-        constexpr std::int64_t MaxPackage = 4LL * 1024 * MiB;
-        if (size <= 0 || size > MaxPackage || !DownloadURL(release.url) || release.sha256.size() != 64 ||
+        if (size <= 0 || static_cast<std::uint64_t>(size) > PackageLimit(data) || !DownloadURL(release.url) || release.sha256.size() != 64 ||
             !std::all_of(release.sha256.begin(), release.sha256.end(), [](unsigned char c) { return std::isxdigit(c); }))
             throw std::runtime_error("Fusion 安装包的大小、下载地址或摘要无效。");
         release.size = static_cast<std::uint64_t>(size);
@@ -74,7 +85,7 @@ bool ValidateRequestedRelease(const Release& release, std::string& error) {
     try { Version(release.version); }
     catch (const std::exception& exception) { error = exception.what(); return false; }
     if (!DownloadURL(release.url) || !ValidDigest(release.sha256) || release.size == 0 ||
-        release.size > 4ULL * 1024 * MiB) {
+        release.size > MaxPackageBytes) {
         error = "更新包的版本、下载地址、大小或摘要无效。";
         return false;
     }

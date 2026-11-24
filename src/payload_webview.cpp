@@ -73,22 +73,15 @@ bool InstallWebView(const fs::path& installer, const fs::path& log, FileWork& wo
     } while(std::chrono::steady_clock::now()<deadline);
     return WebViewInstalled();
 }
-void WriteStandalone(const fs::path& path, HRSRC embedded, FileWork& work) {
+void WriteStandalone(const fs::path& path, FileWork& work) {
     std::ofstream file(path,std::ios::binary|std::ios::trunc);
     file.exceptions(std::ios::failbit|std::ios::badbit);
-    if(embedded) {
-        const auto size=SizeofResource(nullptr,embedded);
-        const auto bytes=static_cast<const char*>(LockResource(LoadResource(nullptr,embedded)));
-        if(!bytes||!size||size>MaxStandaloneBytes)throw std::runtime_error("无法读取内置 WebView2 安装包。");
-        file.write(bytes,size);
-    } else {
-        std::uint64_t received=0;
-        ReadWebViewStandalone([&](const char* bytes,std::size_t count){
-            received+=count;
-            if(received>MaxStandaloneBytes)throw std::runtime_error("WebView2 独立安装包超出大小限制。");
-            file.write(bytes,static_cast<std::streamsize>(count));
-        },work.job);
-    }
+    std::uint64_t received=0;
+    ReadWebViewStandalone([&](const char* bytes,std::size_t count){
+        received+=count;
+        if(received>MaxStandaloneBytes)throw std::runtime_error("WebView2 独立安装包超出大小限制。");
+        file.write(bytes,static_cast<std::streamsize>(count));
+    },work.job);
     file.close();
 }
 bool TryBootstrapper(FileWork& work) {
@@ -101,13 +94,13 @@ bool TryBootstrapper(FileWork& work) {
         return false;
     }
 }
-bool TryStandalone(HRSRC embedded, FileWork& work) {
-    ShowWebViewStep(work,embedded?"正在使用内置微软独立安装包补齐 WebView2":"正在从微软下载 WebView2 独立安装包");
+bool TryStandalone(FileWork& work) {
+    ShowWebViewStep(work,"正在从微软下载 WebView2 独立安装包");
     const auto path=work.staging/StandaloneName;
     std::error_code cleanup;
     bool installed=false;
     try {
-        WriteStandalone(path,embedded,work);
+        WriteStandalone(path,work);
         installed=InstallWebView(path,work.staging/"webview2-standalone.log",work);
     } catch(const std::exception& error) {
         work.progress.events.push_back(std::string("WebView2 独立安装失败：")+error.what());
@@ -120,12 +113,10 @@ void EnsureWebView(FileWork& work) {
     if(WebViewInstalled()){work.progress.checks.push_back("WebView2：已安装，跳过补装。");return;}
     const bool standalone=SupportsStandalone(NativeWindowsVersion(),WindowsProductEdition(),CurrentPlatform().arch) &&
         IsProcessorFeaturePresent(PF_SSE3_INSTRUCTIONS_AVAILABLE);
-    const auto embedded=standalone?FindResourceW(nullptr,L"IYW_WEBVIEW2_X64",MAKEINTRESOURCEW(10)):nullptr;
-    bool installed=embedded?TryStandalone(embedded,work):TryBootstrapper(work);
+    bool installed=TryBootstrapper(work);
     if(!installed) {
         CheckCancel(work.job);
-        if(embedded)installed=TryBootstrapper(work);
-        else if(standalone)installed=TryStandalone(nullptr,work);
+        if(standalone)installed=TryStandalone(work);
     }
     if(!installed)throw std::runtime_error("当前系统未能安装可用的 WebView2。请查看安装详情中的 Windows 版本和微软安装器退出码。");
     work.progress.checks.push_back("WebView2：已自动补装，当前用户运行库检查通过。");

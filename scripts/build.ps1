@@ -1,6 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$WxSource,
-    [ValidateSet('Win32','x64')][string]$Architecture='Win32',
-    [string]$WebView2RuntimeDirectory)
+    [ValidateSet('Win32','x64')][string]$Architecture='Win32')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $sourceRoot = (Resolve-Path -LiteralPath $WxSource).Path
@@ -16,37 +15,12 @@ $outputRoot=Join-Path $projectRoot "build-$Architecture"
 if ($LASTEXITCODE -ne 0) { throw 'Payload dependencies failed.' }
 & $cmakePath -S $projectRoot -B $outputRoot -A $Architecture "-DWX_SOURCE_DIR=$sourceRoot" -DCMAKE_BUILD_TYPE=Release
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
-$buildOptions = @()
-# 正式向导签名作业按标签重建，使用与已验收适配版一致的微软运行库。
-if (!$WebView2RuntimeDirectory -and $env:INSTALLER_TAG) {
-    $WebView2RuntimeDirectory = Join-Path $projectRoot '.cache/webview2-x64'
-    New-Item -ItemType Directory -Force -Path $WebView2RuntimeDirectory | Out-Null
-    $redistributable = Join-Path $WebView2RuntimeDirectory 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
-    $digest = '47bc51387aff95c1275ce38cfbbb5fbab99b43b33214049877bbcdbcc7a970d5'
-    if (!(Test-Path -LiteralPath $redistributable) -or (Get-FileHash -LiteralPath $redistributable).Hash -ne $digest) {
-        $url = 'https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/63f7af19-5d22-43ab-af18-239a7b23b84c/MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
-        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $redistributable
-        if ((Get-FileHash -LiteralPath $redistributable).Hash -ne $digest) { throw 'WebView2 release digest mismatch.' }
-    }
-}
-if ($WebView2RuntimeDirectory) {
-    $runtime = Get-Item -LiteralPath (Join-Path $WebView2RuntimeDirectory 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe')
-    $signature = Get-AuthenticodeSignature -LiteralPath $runtime.FullName
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.GetNameInfo('SimpleName', $false) -ne 'Microsoft Corporation') {
-        throw 'WebView2 standalone installer must have a valid Microsoft signature.'
-    }
-    $directory = [Security.SecurityElement]::Escape($runtime.DirectoryName)
-    $props = Join-Path $outputRoot 'webview2-runtime.props'
-    @"
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ItemDefinitionGroup><ResourceCompile>
-    <PreprocessorDefinitions>IYW_EMBED_WEBVIEW2_X64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    <AdditionalIncludeDirectories>$directory;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-  </ResourceCompile></ItemDefinitionGroup>
-</Project>
-"@ | Set-Content -LiteralPath $props -Encoding UTF8
-    $buildOptions = @('--', "/p:ForceImportBeforeCppTargets=$props")
-}
-& $cmakePath --build $outputRoot --config Release --parallel 6 @buildOptions
+& $cmakePath --build $outputRoot --config Release --parallel 6
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
-Write-Output (Join-Path $outputRoot 'bin\原助理安装向导.exe')
+$executable = Join-Path $outputRoot 'bin\原助理安装向导.exe'
+# 旧客户端只能下载 32 MiB 以内的向导，运行库必须按需获取。
+$legacyInstallerLimit = 32MB
+if ((Get-Item -LiteralPath $executable).Length -gt $legacyInstallerLimit) {
+    throw 'Installer exceeds the legacy 32 MiB limit; do not embed runtime packages.'
+}
+Write-Output $executable
