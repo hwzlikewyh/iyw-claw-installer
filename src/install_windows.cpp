@@ -133,8 +133,7 @@ void VerifyInstalled(const Release& release, FileWork& work) {
     const auto helper = work.progress.destination / "app/iyw-environment.exe";
     if (!fs::is_regular_file(executable) || !fs::is_regular_file(helper) || !fs::file_size(helper))
         throw std::runtime_error("安装器已退出，但缺少主程序或运行环境助手。");
-    if (FileVersion(executable) != release.version)
-        throw std::runtime_error("安装后的版本与 Fusion 稳定版不一致，已停止启动。");
+    RequireAppVersion(executable,release.version,work);
     if(work.retainedFiles.size()!=2){VerifySignature(executable);VerifySignature(helper);}
     if(work.directPayload){RegisterDirectInstall(release,work);}
     try { if(!work.directPayload)InstallUnifiedInstaller(work.progress.destination); }

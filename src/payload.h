@@ -10,7 +10,7 @@ void VerifyPayload(const Release& release, FileWork& work);
 fs::path PayloadRelative(const std::string& value);
 void RequirePlainPath(const fs::path& path);
 void ExtractPayload(FileWork& work);
-void ValidatePayloadTree(const fs::path& root, const Release& release);
+void ValidatePayloadTree(const fs::path& root, const Release& release, FileWork& work);
 void BeginDirectInstall(const Release& release, FileWork& work);
 void PrepareDirectPayload(const Release& release, FileWork& work);
 void FinishDirectInstall(FileWork& work, bool success);

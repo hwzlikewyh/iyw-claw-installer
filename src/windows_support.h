@@ -11,6 +11,7 @@ const OSVERSIONINFOEXW& NativeWindowsVersion();
 DWORD WindowsProductEdition();
 Handle OpenLocked(const fs::path& path);
 std::string FileVersion(const fs::path& path);
+void RequireAppVersion(const fs::path& path, const std::string& expected, FileWork& work);
 void VerifySignature(const fs::path& path);
 void VerifyMicrosoftSignature(const fs::path& path);
 void ReadWebViewStandalone(const Receive& receive, InstallJob& job);

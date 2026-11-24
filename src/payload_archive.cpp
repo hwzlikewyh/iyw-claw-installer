@@ -29,7 +29,7 @@ void WriteEntry(archive* reader, archive_entry* entry, const fs::path& path) {
     file.flush();
     if(count<0||!file||total!=static_cast<std::uint64_t>(archive_entry_size(entry)))throw std::runtime_error("载荷文件解压不完整。");
 }
-void CheckExecutable(const fs::path& file, const Release& release) {
+void CheckExecutable(const fs::path& file, const Release& release, FileWork& work) {
     std::ifstream stream(file,std::ios::binary);std::array<unsigned char,64> header{};
     stream.read(reinterpret_cast<char*>(header.data()),header.size());
     if(!stream||header[0]!='M'||header[1]!='Z')throw std::runtime_error("应用入口不是有效 Windows 程序。");
@@ -37,7 +37,7 @@ void CheckExecutable(const fs::path& file, const Release& release) {
     stream.seekg(offset);std::array<unsigned char,6> pe{};stream.read(reinterpret_cast<char*>(pe.data()),pe.size());
     if(!stream||pe[0]!='P'||pe[1]!='E'||pe[2]||pe[3]||pe[4]!=0x64||pe[5]!=0x86)
         throw std::runtime_error("应用载荷 CPU 架构不匹配。");
-    if(FileVersion(file)!=release.version)throw std::runtime_error("应用入口版本与更新版本不一致。");
+    RequireAppVersion(file,release.version,work);
     VerifySignature(file);
 }
 }
@@ -94,7 +94,7 @@ void ExtractPayload(FileWork& work) {
     }
     if(status!=ARCHIVE_EOF)throw std::runtime_error("应用载荷读取失败。");
 }
-void ValidatePayloadTree(const fs::path& root, const Release& release) {
+void ValidatePayloadTree(const fs::path& root, const Release& release, FileWork& work) {
     const auto path=root/"payload-manifest.json";RequirePlainPath(path);
     if(fs::file_size(path)>32*MiB)throw std::runtime_error("载荷清单过大。");
     std::ifstream file(path);const auto manifest=nlohmann::json::parse(file);
@@ -116,7 +116,7 @@ void ValidatePayloadTree(const fs::path& root, const Release& release) {
         RequirePlainPath(entry.path());
         if(entry.is_regular_file()&&entry.path()!=path&&!declared.count(Fold(fs::relative(entry.path(),root))))throw std::runtime_error("载荷存在未声明文件。");
     }
-    CheckExecutable(root/"app/iyw-claw.exe",release);
+    CheckExecutable(root/"app/iyw-claw.exe",release,work);
     VerifyEnvironmentBinary(root/"app/iyw-environment.exe");
     for(const auto* required:{"app/iyw-environment.exe","app/resources/bundle/index.html","app/xinghe-resources/runtime.json","app/native-share/config.json","app/native-share/register.ps1","app/native-share/share-resources.ps1","app/native-share/IywAssistant.ShareTarget.msix","app/installer/webview2-setup.exe"})
         if(!declared.count(Fold(fs::u8path(required))))throw std::runtime_error("应用载荷缺少必要资源。");

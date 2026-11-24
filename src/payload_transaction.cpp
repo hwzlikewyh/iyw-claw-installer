@@ -72,8 +72,7 @@ void RecoverLegacyInstall(FileWork& work) {
 }
 void ValidateCommitted(FileWork& work) {
     const auto app=work.progress.destination/"app";
-    if(FileVersion(app/"iyw-claw.exe")!=work.progress.version)
-        throw std::runtime_error("环境已提交但应用版本不符，保留备份等待恢复。");
+    RequireAppVersion(app/"iyw-claw.exe",work.progress.version,work);
     VerifySignature(app/"iyw-claw.exe");
     VerifyEnvironmentBinary(EnvironmentHelper(work.progress.destination));
     const auto missing=MissingPresetComponents(work);std::vector<std::string> requiredMissing;
@@ -236,7 +235,7 @@ void PrepareDirectPayload(const Release& release,FileWork& work) {
     RequirePlainPath(work.deployment);fs::create_directories(work.deployment);
     BeginStage(work,Phase::Verifying);
     work.progress.detail="正在退出应用前预先校验应用载荷与 WebView2";work.job.Publish(work.progress);
-    ExtractPayload(work);ValidatePayloadTree(work.deployment/"incoming",release);EnsureWebView(work);
+    ExtractPayload(work);ValidatePayloadTree(work.deployment/"incoming",release,work);EnsureWebView(work);
     CheckCancel(work.job);
 }
 void FinishDirectInstall(FileWork& work,bool success) {
