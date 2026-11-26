@@ -32,13 +32,15 @@
 | 构建与成品 | 原助理 Win32 Release 编译通过；协议 2 能力入口、PE 架构及成品内嵌脚本与最终源码一致性通过 |
 | 候选签名 | 原发布者 Authenticode 签名和 DigiCert 时间戳验证通过 |
 
-正式发布版本为 0.2.20，基于远程主分支 76a94e1 集成本次修复，保留 0.2.19 的目录切换和 WebView2 行为。本次制品为 Windows EXE 和 ZIP；其他平台由既有稳定版继续提供。
+修复首版为 0.2.20，基于远程主分支 76a94e1 集成本次修复，保留 0.2.19 的目录切换和 WebView2 行为。0.2.20 公开回读发现 latest 只返回该版本的两个 Windows 制品，已暂停其 Fusion 分发。0.2.21 同时提供完整的 8 项制品：Windows 使用重新编号的修复包，macOS/Linux 明确复用 0.2.19 原文件。
 
 发布分支再次通过 5 项原生事务场景、已有更新重试和安装位置识别回归、实际向导工作目录检查；Windows 身份脚本与完成 16 项检查的候选完全一致。Win32 Release 构建、发布者签名、RFC 3161 时间戳及 ZIP 内外一致性均验证通过。故障机完整安装仍需实际复测。
 
-Windows EXE SHA-256：`789669db3fb408bca3aba5c8af0acdb263bce69b7506d1e7a1073bb55adb55e6`，大小 4,528,048 字节。
+0.2.20 Windows EXE SHA-256：`789669db3fb408bca3aba5c8af0acdb263bce69b7506d1e7a1073bb55adb55e6`，大小 4,528,048 字节。
 
-Windows ZIP SHA-256：`e106bd8127aa27a7d5a90bf00393f9018c071afab0c3020d8e36e9283a853b4f`。
+0.2.20 Windows ZIP SHA-256：`e106bd8127aa27a7d5a90bf00393f9018c071afab0c3020d8e36e9283a853b4f`。
+
+0.2.21 Windows 构建和包内外签名检查通过。EXE SHA-256 为 `f0886b584ad5e79a93ea2315bec06048895ba1bcdb8ce79305265901b26ec9e2`；ZIP 为 `71767451242acc893cc02125642a97cefddc1c66414e3f6b2c3da7057199e584`。macOS/Linux 六项制品与 0.2.19 逐文件摘要一致。
 
 ## 接口依据
 
