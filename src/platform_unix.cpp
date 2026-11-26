@@ -41,7 +41,7 @@ fs::path DefaultInstallRoot(){
 #ifdef __APPLE__
     return UserHome()/"Applications";
 #else
-    return UserHome()/".local/share/iyw-claw";
+    return UserHome()/".local/share"/setup::Brand().product;
 #endif
 }
 fs::path CreateStaging(){
@@ -50,14 +50,14 @@ fs::path CreateStaging(){
 }
 fs::path AppExecutable(const fs::path& root){
 #ifdef __APPLE__
-    return root/fs::u8path("原助理.app/Contents/MacOS/iyw-claw");
+    return root/fs::u8path(setup::Brand().name + ".app/Contents/MacOS/iyw-claw");
 #else
     return root/"app/AppRun";
 #endif
 }
 fs::path EnvironmentHelper(const fs::path& root){
 #ifdef __APPLE__
-    return root/fs::u8path("原助理.app/Contents/MacOS/iyw-environment");
+    return root/fs::u8path(setup::Brand().name + ".app/Contents/MacOS/iyw-environment");
 #else
     return root/"app/usr/bin/iyw-environment";
 #endif
@@ -92,7 +92,7 @@ void LaunchInstalled(const Snapshot& state,bool restoreSession){
     (void)restoreSession;
     if(state.phase!=Phase::Complete||!fs::is_regular_file(state.executable))throw std::runtime_error("安装尚未完成。");
 #ifdef __APPLE__
-    std::vector<std::string> words{"/usr/bin/open",(state.destination/fs::u8path("原助理.app")).string()};
+    std::vector<std::string> words{"/usr/bin/open","-n",(state.destination/fs::u8path(setup::Brand().name + ".app")).string()};
 #else
     std::vector<std::string> words{state.executable.string()};
 #endif

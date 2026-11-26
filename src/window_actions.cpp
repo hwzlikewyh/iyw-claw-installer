@@ -26,7 +26,7 @@ void SetupWindow::CheckExistingInstallation() {
     if (close_) UpdateControls();
 }
 void SetupWindow::Browse() {
-    wxDirDialog dialog(this, wxS("选择原助理安装位置"), path_->GetValue(), wxDD_DEFAULT_STYLE);
+    wxDirDialog dialog(this, BrandText(wxS("选择原助理安装位置")), path_->GetValue(), wxDD_DEFAULT_STYLE);
     if (dialog.ShowModal() == wxID_OK) {
         auto selected = dialog.GetPath();
 #ifdef _WIN32
@@ -74,7 +74,7 @@ void SetupWindow::StartInstall() {
         }
 #endif
         if (folder.empty() || !folder.is_absolute()) {
-            inlineMessage_=wxS("请选择完整的文件夹路径，例如 D:\\原助理。");canvas_->Refresh();
+            inlineMessage_=BrandText(wxS("请选择完整的文件夹路径，例如 D:\\原助理。"));canvas_->Refresh();
             path_->SetFocus(); return;
         }
         inlineMessage_.clear();closing_=false;
@@ -157,10 +157,10 @@ void SetupWindow::Tick(wxTimerEvent&) {
 }
 void SetupWindow::OfferRestart() {
 #ifdef _WIN32
-    const auto continuation = snapshot_.restartRegistered ? wxS("下次登录此账户时，向导会继续安装。") :
-        wxS("未能登记自动续装。重启后请手动打开原助理安装向导。");
+    const auto continuation = snapshot_.restartRegistered ? wxString(wxS("下次登录此账户时，向导会继续安装。")) :
+        BrandText(wxS("未能登记自动续装。重启后请手动打开原助理安装向导。"));
     wxMessageDialog dialog(this, wxString::FromUTF8(snapshot_.detail) + wxS("\n\n") + continuation +
-        wxS("\n立即重启前请先保存其他程序中的工作。"), wxS("原助理安装需要重启电脑"),
+        wxS("\n立即重启前请先保存其他程序中的工作。"), BrandText(wxS("原助理安装需要重启电脑")),
         wxYES_NO | wxNO_DEFAULT | wxICON_INFORMATION);
     dialog.SetYesNoLabels(wxS("立即重启"), wxS("稍后重启"));
     if (dialog.ShowModal() != wxID_YES) { canvas_->Refresh(false); return; }

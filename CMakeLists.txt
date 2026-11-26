@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 if(APPLE)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.5" CACHE STRING "Minimum supported macOS version")
 endif()
-project(IywClawInstaller VERSION 0.2.21 LANGUAGES CXX)
+project(IywClawInstaller VERSION 0.2.22 LANGUAGES CXX)
+include(scripts/brand.cmake)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -30,18 +31,20 @@ set(wxUSE_NANOSVG OFF CACHE BOOL "" FORCE)
 set(wxUSE_ARTPROVIDER_TANGO OFF CACHE BOOL "" FORCE)
 add_subdirectory("${WX_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/wx" EXCLUDE_FROM_ALL)
 add_executable(iyw-installer WIN32 MACOSX_BUNDLE
-  src/main.cpp src/installer.cpp src/release.cpp src/download.cpp src/progress.cpp src/environment.cpp
+  src/main.cpp src/installer.cpp src/release.cpp src/candidate.cpp src/brand_install.cpp src/brand_runtime.cpp src/download.cpp src/progress.cpp src/environment.cpp
   src/environment_plan.cpp src/environment_inventory.cpp src/environment_prefetch.cpp src/controls.cpp
   src/window.cpp src/window_paint.cpp src/window_art.cpp src/window_motion.cpp src/window_progress.cpp src/window_actions.cpp)
 target_link_libraries(iyw-installer PRIVATE wx::core wx::base)
 target_compile_definitions(iyw-installer PRIVATE wxDEBUG_LEVEL=0)
 target_include_directories(iyw-installer PRIVATE resources vendor)
+target_include_directories(iyw-installer BEFORE PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_include_directories(iyw-installer BEFORE PRIVATE "${IYW_BRAND_ASSETS}")
 set_target_properties(iyw-installer PROPERTIES
-  OUTPUT_NAME "原助理安装向导"
+  OUTPUT_NAME "${IYW_APP_NAME}安装向导"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
   RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
-  MACOSX_BUNDLE_BUNDLE_NAME "原助理安装向导"
-  MACOSX_BUNDLE_GUI_IDENTIFIER "cn.iyw.installer")
+  MACOSX_BUNDLE_BUNDLE_NAME "${IYW_APP_NAME}安装向导"
+  MACOSX_BUNDLE_GUI_IDENTIFIER "${IYW_INSTALLER_IDENTIFIER}")
 if(WIN32)
   if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(PAYLOAD_ARCH Win32)
@@ -83,6 +86,11 @@ if(MSVC)
 endif()
 if(APPLE)
   find_package(ZLIB REQUIRED)
+  if(EXISTS "${IYW_BRAND_ASSETS}/icon.icns")
+    target_sources(iyw-installer PRIVATE "${IYW_BRAND_ASSETS}/icon.icns")
+    set_source_files_properties("${IYW_BRAND_ASSETS}/icon.icns" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(iyw-installer PROPERTIES MACOSX_BUNDLE_ICON_FILE icon.icns)
+  endif()
   target_link_libraries(iyw-installer PRIVATE ZLIB::ZLIB)
   set_target_properties(iyw-installer PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"

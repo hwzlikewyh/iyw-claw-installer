@@ -12,7 +12,7 @@ constexpr double Cx=240,Cy=319;
 constexpr double ArtLeft=20,ArtTop=175,ArtWidth=440,ArtHeight=280;
 constexpr unsigned Segments=90;
 constexpr double TipPeriod=4.5,TipTransition=0.6,TipTravel=14;
-struct Tip {const wchar_t* title;const wchar_t* detail;};
+struct Tip {wxString title;wxString detail;};
 const std::array<Tip,4> Tips{{
     {wxS("一句话，开始下一件事。"),wxS("把想法说出来，和原助理一起完成。")},
     {wxS("把资料，变成清晰答案。"),wxS("阅读、梳理与总结，让重点更容易看见。")},
@@ -26,7 +26,7 @@ void DrawTip(wxGraphicsContext& g,const Tip& tip,double transition){
     const wxColour muted(ui::Muted.Red(),ui::Muted.Green(),ui::Muted.Blue(),alpha);
     g.PushState();g.Translate(0,transition*TipTravel);
     ui::Text(g,{tip.title,{54,493},20,ink,true});
-    ui::Text(g,{tip.detail,{54,527},12,muted});
+    ui::Text(g,{BrandText(tip.detail),{54,527},12,muted});
     g.PopState();
 }
 wxPoint2DDouble Orbit(double angle,double scale=1){
@@ -87,7 +87,7 @@ void SetupWindow::PaintArtwork(wxGraphicsContext& g){
 }
 void SetupWindow::PaintRoute(wxGraphicsContext& g){
     ui::Text(g,{wxS("灵感，即将上线。"),{54,108},23,ui::Ink,true});
-    ui::Text(g,{wxS("原助理 · 与 AI 一起，把想法变成现实"),{54,147},12,ui::Muted});
+    ui::Text(g,{BrandText(wxS("原助理 · 与 AI 一起，把想法变成现实")),{54,147},12,ui::Muted});
     if(Running())return;
     const bool complete=snapshot_.phase==setup::Phase::Complete;
     const auto text=complete?wxString(wxS("已就绪 · 开始你的下一件事")):wxString(wxS("你的下一位搭档，正在这里。"));

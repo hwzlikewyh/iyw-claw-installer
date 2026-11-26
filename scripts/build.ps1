@@ -17,7 +17,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Payload dependencies failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
 & $cmakePath --build $outputRoot --config Release --parallel 6
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
-$executable = Join-Path $outputRoot 'bin\原助理安装向导.exe'
+$brandName = if ($env:IYW_BRAND_NAME) { $env:IYW_BRAND_NAME } else { '原助理' }
+$executable = Join-Path $outputRoot "bin\${brandName}安装向导.exe"
 # 旧客户端只能下载 32 MiB 以内的向导，运行库必须按需获取。
 $legacyInstallerLimit = 32MB
 if ((Get-Item -LiteralPath $executable).Length -gt $legacyInstallerLimit) {

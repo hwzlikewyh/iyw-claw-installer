@@ -18,7 +18,9 @@ UpdateRequest ReadRequest(const fs::path& message) {
     request.destination=fs::u8path(value.at("root").get<std::string>());
     request.packageCache=message.parent_path()/"setup.exe";
     request.release={value.at("version"),value.at("url"),value.at("sha256"),value.at("size"),value.at("signature"),PayloadKind,value.at("releaseId")};
-    request.channel="stable";request.workerMode=true;
+    request.channel=value.value("channel",std::string("stable"));request.workerMode=true;
+    if(request.channel!="stable"&&request.channel!="beta")throw std::runtime_error("更新通道无效。");
+    request.release.channel=request.channel;
     std::string error;if(!ValidateRequestedRelease(request.release,error)||request.release.signature.empty())throw std::runtime_error("安装权限请求的载荷身份无效。");
     if(!request.destination.is_absolute()||request.destination==request.destination.root_path())throw std::runtime_error("安装权限请求的目标目录无效。");
     return request;
@@ -84,6 +86,7 @@ int RunElevatedInstall(const fs::path& message,unsigned parentPid) {
     else request=ReadRequest(message);
     if(!request.destination.is_absolute()||request.destination==request.destination.root_path())
         throw std::runtime_error("安装权限请求的目标目录无效。");
+    LoadInstalledBrand(request.destination);
     const auto directory=message.parent_path();
     Snapshot state;state.destination=request.destination;state.version=request.release.version;
     try {

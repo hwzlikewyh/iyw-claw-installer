@@ -1,5 +1,6 @@
 #include "existing_install.h"
 #include "windows_support.h"
+#include "brand_identity.h"
 #include <array>
 
 namespace setup {
@@ -28,9 +29,9 @@ fs::path NormalizeExistingInstallRoot(const fs::path& candidate) {
     if (root.filename().empty()) root = root.parent_path();
     if (!root.is_absolute() || root == root.root_path()) return {};
     std::error_code error;
-    if (fs::is_regular_file(root / "app/iyw-claw.exe", error)) return root;
+    if (fs::is_regular_file(root / "app/iyw-claw.exe", error) && MatchesInstalledBrand(root/"app")) return root;
     if (_wcsicmp(root.filename().c_str(), L"app") == 0 &&
-        fs::is_regular_file(root / "iyw-claw.exe", error)) return root.parent_path();
+        fs::is_regular_file(root / "iyw-claw.exe", error) && MatchesInstalledBrand(root)) return root.parent_path();
     return {};
 }
 fs::path SelectedInstallRoot(const fs::path& candidate) {
@@ -39,11 +40,11 @@ fs::path SelectedInstallRoot(const fs::path& candidate) {
     if (!existing.empty()) return existing;
     auto root = candidate.lexically_normal();
     if (root.filename().empty() && root != root.root_path()) root = root.parent_path();
-    return root.filename() == L"原助理" ? root : root / L"原助理";
+    return root.filename() == setup::Brand().nameW ? root : root / setup::Brand().nameW;
 }
 fs::path FindExistingInstallRoot() {
-    constexpr const wchar_t* install = L"Software\\iywclaw\\iyw-claw";
-    constexpr const wchar_t* uninstall = L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\原助理";
+    const auto* install = setup::Brand().installKey.c_str();
+    const auto* uninstall = setup::Brand().uninstallKey.c_str();
     const std::array<std::pair<const wchar_t*, const wchar_t*>, 3> values{{
         {install, L"InstallRoot"}, {install, L""}, {uninstall, L"InstallLocation"}
     }};

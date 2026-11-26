@@ -8,6 +8,11 @@
 #include <chrono>
 #include <optional>
 
+inline wxString BrandText(wxString text) {
+    text.Replace(wxS("原助理"), wxString::FromUTF8(setup::Brand().name));
+    return text;
+}
+
 class SetupWindow : public wxFrame {
 public:
     explicit SetupWindow(std::optional<setup::UpdateRequest> request = std::nullopt,

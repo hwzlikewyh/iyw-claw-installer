@@ -54,7 +54,7 @@ fs::path DefaultInstallRoot() {
     std::array<wchar_t, MAX_PATH> local{};
     if (FAILED(SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, local.data())))
         throw std::runtime_error("无法读取当前用户应用目录。");
-    return fs::path(local.data()) / L"原助理";
+    return fs::path(local.data()) / setup::Brand().nameW;
 }
 fs::path UserHome(){
     wchar_t path[MAX_PATH]{};
@@ -85,7 +85,7 @@ void InstallUnifiedInstaller(const fs::path& root) {
     const auto length = GetModuleFileNameW(nullptr, buffer, capacity);
     if (!length || length >= capacity) throw std::runtime_error("无法定位统一安装向导自身。");
     const fs::path source(buffer, buffer + length);
-    const fs::path destination = root / "installer" / fs::u8path("原助理安装向导.exe");
+    const fs::path destination = root / "installer" / fs::u8path(setup::Brand().installerName + ".exe");
     const fs::path markerPath = destination.parent_path() / "unified-installer.v1";
     std::error_code equivalentError;
     if (fs::equivalent(source, destination, equivalentError) && !equivalentError) {

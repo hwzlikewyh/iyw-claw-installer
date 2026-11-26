@@ -1,0 +1,10 @@
+{
+  "brandId": "yun",
+  "displayName": "云助理",
+  "productKey": "iyw-claw",
+  "identifier": "app.iywclaw.yun",
+  "urlScheme": "iyw-assistant-yun",
+  "logo": "logo.png",
+  "logoSha256": "61623e007a09437d05bb4c92efb3a0f71cce5978b7a68d05854c4579d8effe89",
+  "promotionChannel": "stable"
+}

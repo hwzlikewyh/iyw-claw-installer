@@ -14,7 +14,7 @@ struct Queue{
     std::chrono::steady_clock::time_point published=std::chrono::steady_clock::now();
 };
 fs::path Partial(const FileWork& work,const PresetComponent& component){return work.staging/("env-"+component.id+".part");}
-fs::path Cached(const PresetComponent& component){return UserHome()/".iyw-claw/runtime/cache/downloads"/component.sha256/"artifact";}
+fs::path Cached(const PresetComponent& component){return UserHome()/setup::Brand().userDirectory/"runtime/cache/downloads"/component.sha256/"artifact";}
 void Fetch(Queue& queue,const PresetComponent& component){
     std::ofstream output(Partial(queue.work,component),std::ios::binary|std::ios::trunc);
     if(!output)throw std::runtime_error("无法创建预置组件下载缓存。");std::uint64_t done=0;

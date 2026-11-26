@@ -2,13 +2,14 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PackageRoot,
     [Parameter(Mandatory = $true)]
-    [string]$ExpectedThumbprint
+    [string]$ExpectedThumbprint,
+    [string]$ArtifactPrefix = 'YuanAssistant-Setup'
 )
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $PackageRoot).Path
-$executable = Join-Path $root 'YuanAssistant-Setup-windows.exe'
-$archive = Join-Path $root 'YuanAssistant-Setup-windows.zip'
+$executable = Join-Path $root "$ArtifactPrefix-windows.exe"
+$archive = Join-Path $root "$ArtifactPrefix-windows.zip"
 $manifest = Join-Path $root 'SHA256SUMS.txt'
 
 foreach ($path in @($executable, $archive, $manifest)) {

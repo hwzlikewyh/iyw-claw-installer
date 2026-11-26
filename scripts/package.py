@@ -17,8 +17,14 @@ import zipfile
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGES = ROOT / "packages"
 STAGING = ROOT / "build-package"
-APP_NAME = "原助理安装向导"
-VERSION = "0.2.21"
+APP_NAME = os.environ.get("IYW_BRAND_NAME", "原助理") + "安装向导"
+BRAND_ID = os.environ.get("IYW_BRAND_ID", "iyw")
+LINUX_NAME = "yuan-assistant-installer" if BRAND_ID == "iyw" else f"iyw-{BRAND_ID}-installer"
+ARTIFACT_PREFIX = "YuanAssistant-Setup" if BRAND_ID == "iyw" else f"{BRAND_ID}-Setup"
+if BRAND_ID != "iyw":
+    PACKAGES = PACKAGES / BRAND_ID
+    STAGING = STAGING / BRAND_ID
+VERSION = "0.2.22"
 WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 
@@ -47,8 +53,8 @@ def notices(destination):
     for source, name in sources.items():
         shutil.copy2(source, destination / name)
     (destination / "使用说明.txt").write_text(
-        "原助理在线安装向导\n\n运行向导后选择安装位置，按实际进度下载最新稳定版和预置环境。\n"
-        "安装完成后点击“启动原助理”。已安装且健康的组件会复用。\n"
+        f"{APP_NAME}\n\n运行向导后选择安装位置，按实际进度下载匹配的发布版本和预置环境。\n"
+        f"安装完成后点击“启动{os.environ.get('IYW_BRAND_NAME', '原助理')}”。已安装且健康的组件会复用。\n"
         "Windows 发布包的签名状态以发布页 SHA256SUMS 和系统签名验证为准。\n"
         "Windows：支持 Windows 10、11，暂不支持 Win7 系统。\n"
         "macOS: 13.5+，Intel/Apple Silicon 通用包；首次打开受 Gatekeeper 管理。\n"
@@ -95,13 +101,13 @@ def windows():
     folder.mkdir(parents=True, exist_ok=True)
     shutil.copy2(executable, folder / executable.name)
     notices(folder / "licenses")
-    shutil.copy2(executable, PACKAGES / "YuanAssistant-Setup-windows.exe")
-    zip_folder(folder, PACKAGES / "YuanAssistant-Setup-windows.zip")
+    shutil.copy2(executable, PACKAGES / f"{ARTIFACT_PREFIX}-windows.exe")
+    zip_folder(folder, PACKAGES / f"{ARTIFACT_PREFIX}-windows.zip")
 
 
 def finalize_windows():
-    executable = PACKAGES / "YuanAssistant-Setup-windows.exe"
-    archive = PACKAGES / "YuanAssistant-Setup-windows.zip"
+    executable = PACKAGES / f"{ARTIFACT_PREFIX}-windows.exe"
+    archive = PACKAGES / f"{ARTIFACT_PREFIX}-windows.zip"
     if not executable.is_file() or not archive.is_file():
         raise RuntimeError("Windows signing inputs are incomplete")
 
@@ -139,9 +145,9 @@ def macos():
     run("codesign", "--force", "--deep", "--sign", "-", bundle)
     run("codesign", "--verify", "--deep", "--strict", bundle)
     run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", bundle,
-        PACKAGES / "YuanAssistant-Setup-macos-universal.zip")
+        PACKAGES / f"{ARTIFACT_PREFIX}-macos-universal.zip")
     run("hdiutil", "create", "-volname", APP_NAME, "-srcfolder", folder,
-        "-ov", "-format", "UDZO", PACKAGES / "YuanAssistant-Setup-macos-universal.dmg")
+        "-ov", "-format", "UDZO", PACKAGES / f"{ARTIFACT_PREFIX}-macos-universal.dmg")
 
 
 def linux():
@@ -153,29 +159,35 @@ def linux():
         raise RuntimeError("Missing Linux runtime dependency")
     run("file", executable)
     folder = STAGING / f"linux-{arch}"
-    application = folder / "opt/yuan-assistant-installer"
+    application = folder / "opt" / LINUX_NAME
     application.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(executable, application / "yuan-assistant-installer")
-    os.chmod(application / "yuan-assistant-installer", 0o755)
+    shutil.copy2(executable, application / LINUX_NAME)
+    os.chmod(application / LINUX_NAME, 0o755)
     notices(application / "licenses")
     desktop = folder / "usr/share/applications"
     desktop.mkdir(parents=True, exist_ok=True)
-    (desktop / "yuan-assistant-installer.desktop").write_text(
-        "[Desktop Entry]\nType=Application\nName=原助理安装向导\n"
-        "Exec=/opt/yuan-assistant-installer/yuan-assistant-installer\n"
-        "Icon=system-software-install\nTerminal=false\nCategories=Utility;\n", encoding="utf-8")
+    icon = "system-software-install"
+    if (Path(os.environ.get("IYW_BRAND_ASSETS", str(ROOT / "resources"))) / "icon.png").exists():
+        icons = folder / "usr/share/icons/hicolor/256x256/apps"
+        icons.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(os.environ.get("IYW_BRAND_ASSETS", str(ROOT / "resources"))) / "icon.png", icons / f"{LINUX_NAME}.png")
+        icon = LINUX_NAME
+    (desktop / f"{LINUX_NAME}.desktop").write_text(
+        f"[Desktop Entry]\nType=Application\nName={APP_NAME}\n"
+        f"Exec=/opt/{LINUX_NAME}/{LINUX_NAME}\n"
+        f"Icon={icon}\nTerminal=false\nCategories=Utility;\n", encoding="utf-8")
     metadata = folder / "DEBIAN"
     metadata.mkdir(parents=True, exist_ok=True)
     (metadata / "control").write_text(
-        f"Package: yuan-assistant-installer\nVersion: {VERSION}\nArchitecture: {deb_arch}\n"
+        f"Package: {LINUX_NAME}\nVersion: {VERSION}\nArchitecture: {deb_arch}\n"
         "Maintainer: IYW <hwzlikewyh@users.noreply.github.com>\nSection: utils\nPriority: optional\n"
         "Depends: libc6 (>= 2.35), libstdc++6 (>= 11), libgtk-3-0, libsm6, libcurl4, libarchive13, libsodium23, libwebkit2gtk-4.1-0\n"
         "Recommends: fonts-noto-cjk\nDescription: Yuan Assistant online setup wizard\n",
         encoding="utf-8")
     run("dpkg-deb", "--root-owner-group", "--build", folder,
-        PACKAGES / f"YuanAssistant-Setup-linux-{arch}.deb")
-    with tarfile.open(PACKAGES / f"YuanAssistant-Setup-linux-{arch}.tar.gz", "w:gz") as archive:
-        archive.add(application, arcname="yuan-assistant-installer")
+        PACKAGES / f"{ARTIFACT_PREFIX}-linux-{arch}.deb")
+    with tarfile.open(PACKAGES / f"{ARTIFACT_PREFIX}-linux-{arch}.tar.gz", "w:gz") as archive:
+        archive.add(application, arcname=LINUX_NAME)
 
 
 def checksums():
@@ -199,7 +211,7 @@ def main():
         "target", choices=("windows", "finalize-windows", "macos", "linux")
     )
     options = parser.parse_args()
-    PACKAGES.mkdir(exist_ok=True)
+    PACKAGES.mkdir(parents=True, exist_ok=True)
     builders = {
         "windows": windows,
         "finalize-windows": finalize_windows,

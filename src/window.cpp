@@ -16,13 +16,14 @@
 #include <memory>
 #include <array>
 #include <utility>
+#include <cstring>
 
 namespace {
 constexpr int InitialWidth = 960;
 constexpr int InitialHeight = 640;
 }
 SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request, std::optional<setup::fs::path> resumeRoot)
-    : wxFrame(nullptr, wxID_ANY, wxS("原助理 · 安装向导"), wxDefaultPosition, wxDefaultSize,
+    : wxFrame(nullptr, wxID_ANY, BrandText(wxS("原助理 · 安装向导")), wxDefaultPosition, wxDefaultSize,
         wxBORDER_NONE | wxSYSTEM_MENU | wxMINIMIZE_BOX), timer_(this), animation_(this),
         updateRequest_(std::move(request)), updateMode_(updateRequest_.has_value()),
         silentUpdate_(updateRequest_ && updateRequest_->silent), resumed_(resumeRoot.has_value()) {
@@ -32,13 +33,26 @@ SetupWindow::SetupWindow(std::optional<setup::UpdateRequest> request, std::optio
     auto* layout = new wxBoxSizer(wxVERTICAL);
     layout->Add(canvas_, 1, wxEXPAND);
     SetSizer(layout); Layout();
-    canvas_->SetName(wxS("原助理安装向导"));
+    canvas_->SetName(BrandText(wxS("原助理安装向导")));
+#ifdef IYW_RGBA_LOGO
+    wxImage brand(256, 256);
+    std::memcpy(brand.GetData(), LogoRGB, sizeof(LogoRGB));
+    brand.InitAlpha();
+    std::memcpy(brand.GetAlpha(), LogoAlpha, sizeof(LogoAlpha));
+#else
     wxMemoryInputStream stream(LogoData, sizeof(LogoData));
     wxImage brand(stream, wxBITMAP_TYPE_BMP);
     brand.InitAlpha();
     for (int y=0;y<brand.GetHeight();++y) for(int x=0;x<brand.GetWidth();++x)
         if(brand.GetRed(x,y)<22 && brand.GetGreen(x,y)<22 && brand.GetBlue(x,y)<28) brand.SetAlpha(x,y,0);
+#endif
     logo_ = wxBitmap(brand);
+#ifdef _WIN32
+    if(setup::Brand().preserve){
+        wxIcon installed(wxString(setup::Brand().icon.wstring()),wxBITMAP_TYPE_ICO);
+        if(installed.IsOk())logo_=wxBitmap(installed);
+    }
+#endif
     wxIcon icon; icon.CopyFromBitmap(logo_); SetIcon(icon);
     system_ = wxGetOsDescription() + " / " + wxGetNativeCpuArchitectureName();
     CreateControls();
@@ -171,9 +185,9 @@ void SetupWindow::UpdateControls() {
     path_->Enable(!updateMode_);browse_->Enable(!updateMode_);
     primary_->Show(!Running()); primary_->Enable(!Running());
     secondary_->Enable(!cancelling_ && (!Running() || snapshot_.cancellable));
-    primary_->SetLabel(snapshot_.phase == setup::Phase::Complete ? wxS("启动原助理") : ready ?
-        (!installedVersion_.empty() ? (configuring_ ? wxS("检查并更新  →") : wxS("更新原助理  →")) :
-            (configuring_ ? wxS("下载并安装  →") : wxS("开始安装  →"))) : wxS("返回设置并重试"));
+    primary_->SetLabel(snapshot_.phase == setup::Phase::Complete ? BrandText(wxS("启动原助理")) : ready ?
+        (!installedVersion_.empty() ? (configuring_ ? wxString(wxS("检查并更新  →")) : BrandText(wxS("更新原助理  →"))) :
+            (configuring_ ? wxString(wxS("下载并安装  →")) : wxString(wxS("开始安装  →")))) : wxString(wxS("返回设置并重试")));
     secondary_->SetLabel(Running() ? (!snapshot_.cancellable ? wxS("正在完成安装") : cancelling_ ? wxS("取消中…") : wxS("取消安装")) :
         snapshot_.phase == setup::Phase::Complete ? wxS("完成") : ready && configuring_ ? wxS("上一步") : wxS("退出"));
     if (snapshot_.phase == setup::Phase::RestartRequired) {

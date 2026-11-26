@@ -54,7 +54,7 @@ bool DirectNeedsElevation(const fs::path& root) {
     try {
         ProbeDirectory(root);ProbeDirectory(root/"staging");
         if(fs::exists(root/"app"))ProbeDirectory(root/"app");
-        ProbeDirectory(UserHome()/".iyw-claw/inventory");
+        ProbeDirectory(UserHome()/setup::Brand().userDirectory/"inventory");
         return false;
     } catch(const fs::filesystem_error& error) {
         if(error.code().value()!=ERROR_ACCESS_DENIED)throw;
@@ -71,7 +71,7 @@ void InstallDirectElevated(const Release& release,FileWork& work,const UpdateReq
     if(work.silentUpdate)throw std::runtime_error("此安装目录需要管理员授权，请手动点击安装更新。");
     const auto message=work.staging/"elevated-request.json";
     WriteDurableJSON(message,{{"root",work.progress.destination.u8string()},{"version",release.version},
-        {"url",release.url},{"sha256",release.sha256},{"size",release.size},{"signature",release.signature},{"releaseId",release.releaseId}});
+        {"url",release.url},{"sha256",release.sha256},{"size",release.size},{"signature",release.signature},{"releaseId",release.releaseId},{"channel",release.channel}});
     auto messageLock=OpenLocked(message);
     work.installLock.reset();
     auto worker=StartWorker(message);

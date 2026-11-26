@@ -1,4 +1,5 @@
 #pragma once
+#include "brand.h"
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -27,6 +28,7 @@ struct Release {
     std::string signature;
     std::string packageKind;
     std::string releaseId;
+    std::string channel = "stable";
 };
 struct UpdateRequest {
     fs::path destination;
@@ -50,6 +52,7 @@ struct PresetComponent{
     std::uint64_t bytes=0;
 };
 struct Snapshot {
+    std::string releaseChannel = "stable";
     Phase phase = Phase::Ready;
     std::uint64_t phaseDone = 0;
     std::uint64_t phaseTotal = 0;

@@ -1,0 +1,9 @@
+{
+  "brandId": "iyw",
+  "displayName": "原助理",
+  "productKey": "iyw-claw",
+  "identifier": "app.iywclaw",
+  "urlScheme": "iyw-assistant",
+  "logo": "../../resources/runtime-logo.png",
+  "promotionChannel": "stable"
+}

@@ -1,6 +1,8 @@
 #include "release.h"
 #include "diagnostics.h"
+#include "brand_identity.h"
 #include <fstream>
+#include <wx/utils.h>
 #include <algorithm>
 #include <stdexcept>
 #include <utility>
@@ -15,6 +17,10 @@
 namespace setup {
 namespace {
 void ValidateRoot(const fs::path& root, Snapshot& result) {
+#ifndef __APPLE__
+    if(!MatchesInstalledBrand(root/"app"))
+        throw std::runtime_error("所选目录属于其他品牌，请选择本品牌的安装位置。");
+#endif
     if (root.empty() || !root.is_absolute() || root == root.root_path())
         throw std::runtime_error("请选择完整的应用文件夹路径，不要选择磁盘根目录。");
     std::error_code error;
@@ -80,6 +86,7 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     CheckSystem(work); CheckEnvironment(work);
     BeginStage(work, Phase::Resolving);
     const auto release = request ? request->release : ResolveRelease(platform, work.job);
+    wxSetEnv("IYW_CLAW_RELEASE_CHANNEL",wxString::FromUTF8(release.channel));
 #ifdef _WIN32
     work.directPayload=release.packageKind==PayloadKind;
     if(work.directPayload)LockDirectInstall(work);
@@ -88,7 +95,8 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     {std::ofstream identity(work.staging/"selected-release.txt",std::ios::binary);
         identity<<release.version<<'\n'<<release.sha256<<'\n';}
     work.progress.version = release.version;
-    work.progress.events.push_back("Fusion 稳定版：" + release.version + "；平台：" + platform.target + "/" + platform.arch);
+    work.progress.releaseChannel = release.channel;
+    work.progress.events.push_back("Fusion 发布版本：" + release.version + "；通道：" + release.channel + "；平台：" + platform.target + "/" + platform.arch);
     work.job.Publish(work.progress);
     ResolvePresetEnvironment(release,work);
     constexpr std::uint64_t MinimumFree = 2ULL * 1024 * MiB;
@@ -139,6 +147,8 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     }
     if(work.directPayload)RecoverDirectInstall(work);
 #endif
+    PrepareBrandAssets(work.progress.destination);
+    SaveBrandConfiguration(work);
     if(!reused)InstallPackage(release,work);
     PrepareEnvironment(release, work, preparedByInstaller);
 #ifdef _WIN32
@@ -218,7 +228,7 @@ void InstallJob::Run(fs::path root, std::optional<UpdateRequest> request) {
     }
     if(!work.staging.empty()){
         try{
-            const auto logs=UserHome()/".iyw-claw/logs/installer"/work.staging.filename();fs::create_directories(logs);
+            const auto logs=UserHome()/setup::Brand().userDirectory/"logs/installer"/work.staging.filename();fs::create_directories(logs);
             for(const auto& entry:fs::directory_iterator(work.staging)){
                 if(!entry.is_regular_file())continue;const auto name=entry.path().filename().string();
                 if(name.find(".log")!=std::string::npos||name.find(".stderr")!=std::string::npos)

@@ -1,6 +1,11 @@
 name: Build installers
 on:
   workflow_dispatch:
+    inputs:
+      sign_windows:
+        description: Sign on this repository runner (candidate signing uses the PC repository)
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ['src/**', 'resources/**', 'vendor/**', 'scripts/**', 'CMakeLists.txt', '.github/workflows/build.yml']
@@ -11,10 +16,21 @@ concurrency:
   cancel-in-progress: false
 jobs:
   windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        brand: [iyw, yun]
     runs-on: windows-2022
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Prepare installer branding
+        run: |
+          python -m pip install Pillow==11.3.0
+          python scripts/prepare-ci-brand.py "${{ matrix.brand }}"
       - name: Fetch verified dependency sources
         run: python scripts/fetch-deps.py
       - name: Build Win32 entry point
@@ -24,7 +40,7 @@ jobs:
       - name: Launch welcome window
         shell: pwsh
         run: |
-          $app = Start-Process -FilePath './build-Win32/bin/原助理安装向导.exe' -PassThru
+          $app = Start-Process -FilePath "./build-Win32/bin/$($env:IYW_BRAND_NAME)安装向导.exe" -PassThru -WindowStyle Hidden
           if (-not $app.WaitForInputIdle(15000)) { throw 'Window did not become ready' }
           Start-Sleep -Seconds 3
           $app.Refresh()
@@ -34,15 +50,19 @@ jobs:
           if ($app.ExitCode -ne 0) { throw 'Installer exited with an error' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: windows-signing-input
-          path: packages/*
+          name: windows-signing-input-${{ matrix.brand }}
+          path: ${{ env.IYW_PACKAGE_DIR }}/*
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
   windows-sign:
     name: Sign Windows installer
     needs: windows
-    if: ${{ needs.windows.result == 'success' }}
+    if: ${{ needs.windows.result == 'success' && inputs.sign_windows }}
+    strategy:
+      fail-fast: false
+      matrix:
+        brand: [iyw, yun]
     runs-on: [self-hosted, Windows, X64, iyw-signing]
     timeout-minutes: 30
     env:
@@ -55,6 +75,13 @@ jobs:
       NO_PROXY: localhost,127.0.0.1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Prepare installer branding
+        run: |
+          python -m pip install Pillow==11.3.0
+          python scripts/prepare-ci-brand.py "${{ matrix.brand }}"
       - name: Checkout pinned signing tools
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -76,8 +103,8 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: windows-signing-input
-          path: packages
+          name: windows-signing-input-${{ matrix.brand }}
+          path: ${{ env.IYW_PACKAGE_DIR }}
       - name: Sign Windows executable
         shell: pwsh
         run: |
@@ -87,7 +114,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:IYW_CLAW_SAFENET_PIN)) {
             throw 'IYW_CLAW_SAFENET_PIN is not configured.'
           }
-          $file = (Resolve-Path -LiteralPath 'packages\YuanAssistant-Setup-windows.exe').Path
+          $file = (Resolve-Path -LiteralPath "$env:IYW_PACKAGE_DIR/$env:IYW_ARTIFACT_PREFIX-windows.exe").Path
           node .signing\iyw-claw\src-tauri\scripts\sign-staged-windows.mjs $file
           if ($LASTEXITCODE -ne 0) { throw 'Windows Authenticode signing failed.' }
       - name: Rebuild signed ZIP and checksums
@@ -95,49 +122,80 @@ jobs:
         run: python scripts/package.py finalize-windows
       - name: Verify final Windows package
         shell: pwsh
-        run: ./scripts/verify-windows-package.ps1 -PackageRoot packages -ExpectedThumbprint $env:IYW_CLAW_SIGN_THUMBPRINT
+        run: ./scripts/verify-windows-package.ps1 -PackageRoot $env:IYW_PACKAGE_DIR -ArtifactPrefix $env:IYW_ARTIFACT_PREFIX -ExpectedThumbprint $env:IYW_CLAW_SIGN_THUMBPRINT
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: windows-universal
-          path: packages/*
+          name: windows-universal-${{ matrix.brand }}
+          path: ${{ env.IYW_PACKAGE_DIR }}/*
           if-no-files-found: error
           compression-level: 0
   macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        brand: [iyw, yun]
     runs-on: macos-15
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Prepare installer branding
+        run: |
+          python -m pip install Pillow==11.3.0
+          python scripts/prepare-ci-brand.py "${{ matrix.brand }}"
       - name: Fetch verified dependency sources
         run: python3 scripts/fetch-deps.py --macos
       - name: Build Intel and Apple Silicon universal app
         run: bash scripts/build-macos.sh
       - name: Package, verify architecture and sign locally
         run: python3 scripts/package.py macos
+      - name: Sign macOS installer
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          mkdir -p build-signing/input
+          cp "$IYW_PACKAGE_DIR/$IYW_ARTIFACT_PREFIX-macos-universal.zip" build-signing/input/
+          export SOURCE_SHA256=$(shasum -a 256 "build-signing/input/$IYW_ARTIFACT_PREFIX-macos-universal.zip" | cut -d ' ' -f 1)
+          bash scripts/import-macos-signing.sh
       - name: Launch welcome window
         run: |
-          "build-native/bin/原助理安装向导.app/Contents/MacOS/原助理安装向导" &
+          "build-signing/app/${IYW_BRAND_NAME}安装向导.app/Contents/MacOS/${IYW_BRAND_NAME}安装向导" &
           app_pid=$!
           sleep 5
           kill -0 "$app_pid"
           kill -TERM "$app_pid"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: macos-universal
-          path: packages/*
+          name: macos-universal-${{ matrix.brand }}
+          path: ${{ env.IYW_PACKAGE_DIR }}/*
           if-no-files-found: error
   linux:
     strategy:
       fail-fast: false
       matrix:
+        brand: [iyw, yun]
+        platform: [x64, arm64]
         include:
-          - runner: ubuntu-22.04
+          - platform: x64
+            runner: ubuntu-22.04
             arch: x86_64
-          - runner: ubuntu-22.04-arm
+          - platform: arm64
+            runner: ubuntu-22.04-arm
             arch: aarch64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Prepare installer branding
+        run: |
+          python -m pip install Pillow==11.3.0
+          python scripts/prepare-ci-brand.py "${{ matrix.brand }}"
       - name: Install native build dependencies
         run: |
           sudo apt-get update -qq
@@ -154,12 +212,12 @@ jobs:
       - name: Launch welcome window under Xvfb
         run: |
           set +e
-          xvfb-run -a timeout 5s "build-native/bin/原助理安装向导"
+          xvfb-run -a timeout 5s "build-native/bin/${IYW_BRAND_NAME}安装向导"
           result=$?
           set -e
           test "$result" -eq 124
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: linux-${{ matrix.arch }}
-          path: packages/*
+          name: linux-${{ matrix.arch }}-${{ matrix.brand }}
+          path: ${{ env.IYW_PACKAGE_DIR }}/*
           if-no-files-found: error

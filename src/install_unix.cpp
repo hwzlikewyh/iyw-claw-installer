@@ -7,7 +7,7 @@ namespace setup {
 namespace {
 fs::path AppDirectory(const fs::path& root){
 #ifdef __APPLE__
-    return root/fs::u8path("原助理.app");
+    return root/fs::u8path(setup::Brand().name + ".app");
 #else
     return root/"app";
 #endif

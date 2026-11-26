@@ -47,7 +47,7 @@ void PrepareDirectEnvironment(const Release& release, FileWork& work, bool befor
         if(line.rfind("Transaction=",0)==0)id=line.substr(sizeof("Transaction=")-1);
     }
     if(id.size()!=32||id.find_first_not_of("0123456789abcdef")!=std::string::npos)throw std::runtime_error("环境事务编号无效。");
-    const auto prepared=UserHome()/".iyw-claw/staging/environment"/id/"prepared.json";
+    const auto prepared=UserHome()/setup::Brand().userDirectory/"staging/environment"/id/"prepared.json";
     if(fs::file_size(prepared)>64*MiB)throw std::runtime_error("环境事务清单过大。");
     std::ifstream file(prepared);const auto state=nlohmann::json::parse(file);
     if(state.at("transactionId")!=id)throw std::runtime_error("环境事务编号不匹配。");

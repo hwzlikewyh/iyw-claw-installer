@@ -8,7 +8,7 @@ namespace setup {
 void ResolvePresetEnvironment(const Release& release,FileWork& work){
     using Json=nlohmann::json;const auto platform=CurrentPlatform();
     const Json request={{"schemaVersion",1},{"installationId","yuan-installer-environment"},
-        {"clientVersion",release.version},{"pcVersion",release.version},{"channel","stable"},
+        {"clientVersion",release.version},{"pcVersion",release.version},{"channel",release.channel},
         {"runtime","desktop"},{"target",platform.target},{"arch",platform.arch},{"inventory",Json::array()}};
     std::string response;
     PostHttps(std::string(FusionBase)+"/app-updates/v1/environment/resolve",request.dump(),

@@ -15,6 +15,13 @@ fs::path CreateStaging();
 Release ParseRelease(const std::string& body);
 bool ValidateRequestedRelease(const Release& release, std::string& error);
 Release ResolveRelease(const Platform& platform, InstallJob& job);
+Release ResolveCandidate(const Platform& platform, InstallJob& job);
+Release ResolveChannelRelease(const Platform& platform, InstallJob& job,const std::string& channel);
+Release ResolveStableRelease(const Platform& platform, InstallJob& job);
+fs::path BrandConfigurationDirectory(const fs::path& root);
+fs::path InstalledBrandIcon(const fs::path& root);
+void PrepareBrandAssets(const fs::path& root);
+void SaveBrandConfiguration(FileWork& work);
 void ReadHttps(const std::string& url, const Receive& receive, InstallJob& job);
 void PostHttps(const std::string& url,const std::string& body,const Receive& receive,InstallJob& job);
 bool ReadHttpsRange(const std::string& url, const std::pair<std::uint64_t,std::uint64_t>& range,

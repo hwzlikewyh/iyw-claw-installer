@@ -1,0 +1,5 @@
+#pragma once
+inline const unsigned char RuntimeBrandLogo[] = { @IYW_LOGO_BYTES@ };
+inline const unsigned char RuntimeBrandIcon[] = { @IYW_ICON_BYTES@ };
+#define IYW_RUNTIME_LOGO_NAME "@IYW_LOGO_DIGEST@.png"
+#define IYW_RUNTIME_ICON_NAME "@IYW_ICON_DIGEST@.ico"

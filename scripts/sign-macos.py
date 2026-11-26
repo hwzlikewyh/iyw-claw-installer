@@ -8,10 +8,11 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "build-signing"
-OUTPUT = ROOT / "packages"
-NAME = "原助理安装向导"
-ZIP_NAME = "YuanAssistant-Setup-macos-universal.zip"
-DMG_NAME = "YuanAssistant-Setup-macos-universal.dmg"
+OUTPUT = ROOT / os.environ.get("IYW_PACKAGE_DIR", "packages")
+NAME = os.environ.get("IYW_BRAND_NAME", "原助理") + "安装向导"
+ARTIFACT_PREFIX = "YuanAssistant-Setup" if os.environ.get("IYW_BRAND_ID", "iyw") == "iyw" else os.environ["IYW_BRAND_ID"] + "-Setup"
+ZIP_NAME = ARTIFACT_PREFIX + "-macos-universal.zip"
+DMG_NAME = ARTIFACT_PREFIX + "-macos-universal.dmg"
 
 
 def run(*args):
@@ -84,7 +85,7 @@ def write_checksums():
 
 
 def main():
-    OUTPUT.mkdir(exist_ok=True)
+    OUTPUT.mkdir(parents=True, exist_ok=True)
     bundle = prepare_bundle()
     detail = sign(bundle)
     archive = OUTPUT / ZIP_NAME
@@ -96,7 +97,7 @@ def main():
         run("spctl", "--assess", "--type", "execute", "--verbose=2", bundle)
     image = OUTPUT / DMG_NAME
     run("hdiutil", "create", "-volname", NAME, "-srcfolder", bundle.parent,
-        "-format", "UDZO", image)
+        "-format", "UDZO", "-ov", image)
     dmg_detail = sign(image)
     dmg_notary = notarize(image, [image])
     report = {"appSignature": detail, "dmgSignature": dmg_detail,

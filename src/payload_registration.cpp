@@ -9,9 +9,9 @@
 namespace setup {
 namespace {
 using Json=nlohmann::json;
-constexpr const wchar_t* InstallKey=L"Software\\iywclaw\\iyw-claw";
-constexpr const wchar_t* UninstallKey=L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\原助理";
-constexpr wchar_t AppUserModelId[]=L"app.iywclaw";
+
+
+
 constexpr PROPERTYKEY AppUserModelIdKey=INIT_PKEY_AppUserModel_ID;
 template<class Interface>
 struct ComRelease{void operator()(Interface* value)const noexcept{if(value)value->Release();}};
@@ -34,8 +34,8 @@ fs::path PowerShell(){
     BOOL wow64=FALSE;IsWow64Process(GetCurrentProcess(),&wow64);
     return fs::path(windows)/(wow64?L"Sysnative":L"System32")/L"WindowsPowerShell/v1.0/powershell.exe";
 }
-std::vector<fs::path> Shortcuts(){return {UserFolder(CSIDL_DESKTOPDIRECTORY)/L"原助理.lnk",UserFolder(CSIDL_PROGRAMS)/L"原助理/原助理.lnk"};}
-std::vector<std::pair<std::wstring,std::wstring>> Values(){return {{InstallKey,L"InstallRoot"},{InstallKey,L""},{UninstallKey,L"DisplayName"},{UninstallKey,L"DisplayVersion"},{UninstallKey,L"Publisher"},{UninstallKey,L"InstallLocation"},{UninstallKey,L"UninstallString"},{UninstallKey,L"DisplayIcon"},{L"Software\\Classes\\iyw-assistant",L""},{L"Software\\Classes\\iyw-assistant",L"URL Protocol"},{L"Software\\Classes\\iyw-assistant\\shell\\open\\command",L""}};}
+std::vector<fs::path> Shortcuts(){return {UserFolder(CSIDL_DESKTOPDIRECTORY)/(setup::Brand().nameW + L".lnk"),UserFolder(CSIDL_PROGRAMS)/setup::Brand().nameW/(setup::Brand().nameW + L".lnk")};}
+std::vector<std::pair<std::wstring,std::wstring>> Values(){return {{setup::Brand().installKey.c_str(),L"InstallRoot"},{setup::Brand().installKey.c_str(),L""},{setup::Brand().uninstallKey.c_str(),L"DisplayName"},{setup::Brand().uninstallKey.c_str(),L"DisplayVersion"},{setup::Brand().uninstallKey.c_str(),L"Publisher"},{setup::Brand().uninstallKey.c_str(),L"InstallLocation"},{setup::Brand().uninstallKey.c_str(),L"UninstallString"},{setup::Brand().uninstallKey.c_str(),L"DisplayIcon"},{L"Software\\Classes\\" + setup::Brand().schemeW,L""},{L"Software\\Classes\\" + setup::Brand().schemeW,L"URL Protocol"},{L"Software\\Classes\\" + setup::Brand().schemeW + L"\\shell\\open\\command",L""}};}
 void BackupRegistration(FileWork& work){
     const auto path=work.deployment/"registration.json";if(fs::exists(path))return;
     Json values=Json::array();for(const auto& entry:Values()){
@@ -50,7 +50,7 @@ fs::path InstallDirectWizard(FileWork& work){
     const auto source=CurrentInstaller();
     auto lock=OpenLocked(source);VerifySignature(source);
     const auto digest=HashFile(source);
-    const auto destination=work.progress.destination/"installer"/fs::u8path("原助理安装向导-"+digest+".exe");
+    const auto destination=work.progress.destination/"installer"/fs::u8path(std::string(setup::Brand().installerName + "-")+digest+".exe");
     RequirePlainPath(destination);fs::create_directories(destination.parent_path());
     // 按内容存放，可从已安装向导更新自身；保留旧向导供事务回滚使用。
     if(fs::exists(destination)) {
@@ -63,7 +63,7 @@ fs::path InstallDirectWizard(FileWork& work){
     fs::rename(temporary,destination);
     return destination;
 }
-void Shortcut(const fs::path& path,const fs::path& executable){
+void Shortcut(const fs::path& path,const fs::path& executable,const fs::path& icon){
     RequirePlainPath(path);fs::create_directories(path.parent_path());
     IShellLinkW* rawLink=nullptr;
     if(FAILED(CoCreateInstance(CLSID_ShellLink,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&rawLink))))
@@ -71,13 +71,13 @@ void Shortcut(const fs::path& path,const fs::path& executable){
     std::unique_ptr<IShellLinkW,ComRelease<IShellLinkW>> link(rawLink);
     if(FAILED(link->SetPath(executable.c_str()))||
        FAILED(link->SetWorkingDirectory(executable.parent_path().c_str()))||
-       FAILED(link->SetIconLocation(executable.c_str(),0)))
+       FAILED(link->SetIconLocation(icon.c_str(),0)))
         throw std::runtime_error("无法设置快捷方式目标或图标。");
     IPropertyStore* rawProperties=nullptr;
     if(FAILED(link->QueryInterface(IID_PPV_ARGS(&rawProperties))))
         throw std::runtime_error("无法设置快捷方式应用标识。");
     std::unique_ptr<IPropertyStore,ComRelease<IPropertyStore>> properties(rawProperties);
-    PROPVARIANT appId{};appId.vt=VT_LPWSTR;appId.pwszVal=const_cast<PWSTR>(AppUserModelId);
+    PROPVARIANT appId{};appId.vt=VT_LPWSTR;appId.pwszVal=const_cast<PWSTR>(setup::Brand().identifierW.c_str());
     if(FAILED(properties->SetValue(AppUserModelIdKey,appId))||
        FAILED(properties->Commit()))
         throw std::runtime_error("无法保存快捷方式应用标识。");
@@ -150,6 +150,7 @@ int RunMainIdentity(FileWork& work,const fs::path& log,bool restore){
     return RunCommand({PowerShell(),args,log,180,work.staging});
 }
 void RegisterNativeShare(FileWork& work){
+    if(Brand().id!="iyw")return;
     const auto script=work.progress.destination/fs::u8path("app/native-share/register.ps1");
     const bool required=RestoreShellResources(work);
     const auto log=work.staging/"native-share-register.log";
@@ -170,16 +171,17 @@ void RegisterDirectInstall(const Release& release,FileWork& work){
     BackupRegistration(work);
     const auto root=work.progress.destination;const auto exe=root/"app/iyw-claw.exe";
     const auto uninstall=InstallDirectWizard(work);
-    Set(InstallKey,L"InstallRoot",root.wstring());Set(InstallKey,L"",root.wstring());
-    Set(UninstallKey,L"DisplayName",L"原助理");Set(UninstallKey,L"DisplayVersion",fs::u8path(release.version).wstring());
-    Set(UninstallKey,L"Publisher",L"厦门市虹约产品设计有限公司");Set(UninstallKey,L"InstallLocation",root.wstring());
-    Set(UninstallKey,L"UninstallString",L"\""+uninstall.wstring()+L"\" --uninstall-root \""+root.wstring()+L"\"");
-    Set(UninstallKey,L"DisplayIcon",exe.wstring());
-    Set(L"Software\\Classes\\iyw-assistant",L"",L"URL:原助理");Set(L"Software\\Classes\\iyw-assistant",L"URL Protocol",L"");
-    Set(L"Software\\Classes\\iyw-assistant\\shell\\open\\command",L"",L"\""+exe.wstring()+L"\" \"%1\"");
+    Set(setup::Brand().installKey.c_str(),L"InstallRoot",root.wstring());Set(setup::Brand().installKey.c_str(),L"",root.wstring());
+    Set(setup::Brand().uninstallKey.c_str(),L"DisplayName",setup::Brand().nameW);Set(setup::Brand().uninstallKey.c_str(),L"DisplayVersion",fs::u8path(release.version).wstring());
+    Set(setup::Brand().uninstallKey.c_str(),L"Publisher",L"厦门市虹约产品设计有限公司");Set(setup::Brand().uninstallKey.c_str(),L"InstallLocation",root.wstring());
+    Set(setup::Brand().uninstallKey.c_str(),L"UninstallString",L"\""+uninstall.wstring()+L"\" --uninstall-root \""+root.wstring()+L"\"");
+    const auto icon=InstalledBrandIcon(root);
+    Set(setup::Brand().uninstallKey.c_str(),L"DisplayIcon",icon.wstring());
+    Set(L"Software\\Classes\\" + setup::Brand().schemeW,L"",L"URL:原助理");Set(L"Software\\Classes\\" + setup::Brand().schemeW,L"URL Protocol",L"");
+    Set(L"Software\\Classes\\" + setup::Brand().schemeW + L"\\shell\\open\\command",L"",L"\""+exe.wstring()+L"\" \"%1\"");
     const auto status=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
     if(FAILED(status))throw std::runtime_error("无法初始化快捷方式服务。");
-    try{for(const auto& target:Shortcuts())Shortcut(target,exe);}catch(...){CoUninitialize();throw;}
+    try{for(const auto& target:Shortcuts())Shortcut(target,exe,icon);}catch(...){CoUninitialize();throw;}
     CoUninitialize();
     RegisterNativeShare(work);
 }
@@ -211,7 +213,7 @@ void RestoreDirectRegistration(FileWork& work){
     }
 }
 void UninstallDirect(const fs::path& root){
-    if(root.empty()||!root.is_absolute()||root==root.root_path()||fs::path(Read(InstallKey,L"InstallRoot"))!=root)throw std::runtime_error("卸载目录与已登记应用不匹配。");
+    if(root.empty()||!root.is_absolute()||root==root.root_path()||fs::path(Read(setup::Brand().installKey.c_str(),L"InstallRoot"))!=root)throw std::runtime_error("卸载目录与已登记应用不匹配。");
     if(DirectNeedsElevation(root)){UninstallDirectElevated(root);return;}
     RequirePlainPath(root);InstallJob job;Snapshot state;state.destination=root;
     FileWork work{job,{},state,std::chrono::steady_clock::now(),{}};
@@ -219,7 +221,7 @@ void UninstallDirect(const fs::path& root){
     const bool hasMain=fs::is_regular_file(root/"app/iyw-claw.exe");
     if(hasMain)VerifySignature(root/"app/iyw-claw.exe");
     const auto script=root/"app/native-share/register.ps1";
-    if(hasMain&&fs::is_regular_file(script)){
+    if(Brand().id=="iyw"&&hasMain&&fs::is_regular_file(script)){
         work.staging=CreateStaging();
         if(RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string(),"-Unregister"},work.staging/"unregister.log",120})!=0)throw std::runtime_error("系统分享入口未移除，卸载已停止。");
     }
@@ -228,8 +230,8 @@ void UninstallDirect(const fs::path& root){
         fs::remove_all(root/"app");
     }
     for(const auto& path:Shortcuts()){RequirePlainPath(path);fs::remove(path);}
-    RegDeleteTreeW(HKEY_CURRENT_USER,UninstallKey);RegDeleteTreeW(HKEY_CURRENT_USER,L"Software\\Classes\\iyw-assistant");
-    auto key=OpenKey(InstallKey);RegDeleteValueW(key.get(),L"InstallRoot");RegDeleteValueW(key.get(),L"");
+    RegDeleteTreeW(HKEY_CURRENT_USER,setup::Brand().uninstallKey.c_str());RegDeleteTreeW(HKEY_CURRENT_USER,(L"Software\\Classes\\" + setup::Brand().schemeW).c_str());
+    auto key=OpenKey(setup::Brand().installKey.c_str());RegDeleteValueW(key.get(),L"InstallRoot");RegDeleteValueW(key.get(),L"");
     // 保留当前运行的安装向导和用户环境，用户可再次安装；不递归删除安装根目录。
 }
 }

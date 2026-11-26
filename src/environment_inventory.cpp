@@ -9,7 +9,7 @@ bool Committed(const Json& inventory){
     const auto generation=inventory.value("generation",std::string());
     if(generation.empty()||generation.size()>128||generation=="."||generation==".."||
         generation.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")!=std::string::npos)return false;
-    const auto path=UserHome()/".iyw-claw/inventory/transactions"/(generation+".json");
+    const auto path=UserHome()/setup::Brand().userDirectory/"inventory/transactions"/(generation+".json");
     if(!fs::is_regular_file(path)||fs::file_size(path)>4096)return false;
     std::ifstream file(path);Json receipt;file>>receipt;
     return receipt.is_object()&&receipt.value("state",std::string())=="committed"&&receipt.value("generation",std::string())==generation;
@@ -18,7 +18,7 @@ fs::path RuntimePath(const std::string& value){
     const auto relative=fs::u8path(value);
     if(relative.empty()||relative.is_absolute())return {};
     for(const auto& part:relative)if(part=="..")return {};
-    return UserHome()/".iyw-claw"/relative;
+    return UserHome()/setup::Brand().userDirectory/relative;
 }
 bool QuickEntries(const Json& component){
     if(!component.contains("relativePath")||!component["relativePath"].is_string()||
@@ -47,7 +47,7 @@ bool QuickEntries(const Json& component){
 }
 std::vector<std::string> MissingPresetComponents(const FileWork& work){
     std::vector<std::string> missing;
-    const auto path=UserHome()/".iyw-claw/inventory/environment-current.json";
+    const auto path=UserHome()/setup::Brand().userDirectory/"inventory/environment-current.json";
     Json inventory;
     try{
         if(fs::is_regular_file(path)&&fs::file_size(path)<=8*MiB){std::ifstream file(path);file>>inventory;}

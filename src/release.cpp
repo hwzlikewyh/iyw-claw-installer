@@ -47,7 +47,10 @@ Release ParseRelease(const std::string& body) {
         const auto& data = envelope.at("data");
         if (!data.is_object() || !data.contains("version"))
             throw std::runtime_error("Fusion 暂未发布此系统与架构的稳定版安装包。");
-        if (data.at("channel") != "stable") throw std::runtime_error("Fusion 返回了非稳定通道，已停止安装。");
+        const auto channel = data.at("channel").get<std::string>();
+        if (channel != "stable" && channel != "beta") throw std::runtime_error("Fusion 返回了无效发布通道。");
+        if (channel == "beta" && std::string(setup::Brand().releaseId).empty())
+            throw std::runtime_error("正式安装向导不能安装测试版。");
         const auto platform=CurrentPlatform();
         if(platform.target=="windows"&&platform.arch=="x86_64"&&data.contains("app_payload")) {
             const auto& payload=data.at("app_payload");
@@ -64,6 +67,7 @@ Release ParseRelease(const std::string& body) {
             std::string error;
             if(!ValidateRequestedRelease(release,error)||release.signature.empty())throw std::runtime_error("应用载荷元数据无效："+error);
             std::transform(release.sha256.begin(),release.sha256.end(),release.sha256.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+            release.channel = channel;
             return release;
         }
         Release release{data.at("version"), data.at("url"), data.at("sha256"), 0};
@@ -76,6 +80,8 @@ Release ParseRelease(const std::string& body) {
         release.signature=data.value("signature",std::string());
         std::transform(release.sha256.begin(), release.sha256.end(), release.sha256.begin(),
             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        release.channel = channel;
+        release.releaseId = data.value("release_id", std::string());
         return release;
     } catch (const nlohmann::json::exception&) {
         throw std::runtime_error("Fusion 版本响应格式异常，请稍后重试。");
@@ -92,9 +98,15 @@ bool ValidateRequestedRelease(const Release& release, std::string& error) {
     return true;
 }
 Release ResolveRelease(const Platform& platform, InstallJob& job) {
+    return std::string(setup::Brand().releaseId).empty() ? ResolveStableRelease(platform, job) : ResolveCandidate(platform, job);
+}
+Release ResolveStableRelease(const Platform& platform, InstallJob& job) {
+    return ResolveChannelRelease(platform,job,"stable");
+}
+Release ResolveChannelRelease(const Platform& platform, InstallJob& job,const std::string& channel) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto url = std::string(FusionBase) + "/app-updates/v1/check/" + platform.target + "/" + platform.arch +
-        "/0.0.0?product=iyw-claw&runtime=desktop&channel=stable&reason=manual&t=" + std::to_string(stamp);
+        "/0.0.0?product=iyw-claw&runtime=desktop&channel=" + channel + "&reason=manual&t=" + std::to_string(stamp);
     std::string body;
     ReadHttps(url, [&body](const char* bytes, std::size_t count) {
         if (body.size() + count > MiB) throw std::runtime_error("Fusion 版本响应过大。");

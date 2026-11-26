@@ -22,7 +22,7 @@ std::string ReadOutput(const fs::path& path){
 }
 namespace {
 Json Inventory(){
-    const auto path=UserHome()/".iyw-claw/inventory/environment-current.json";
+    const auto path=UserHome()/setup::Brand().userDirectory/"inventory/environment-current.json";
     if(!fs::is_regular_file(path))return {};
     try{
         if(fs::file_size(path)>8*MiB)return {};

@@ -5,7 +5,7 @@
 #include <wx/pen.h>
 namespace {constexpr double Left=520;constexpr double TrackWidth=384;}
 void SetupWindow::PaintProgress(wxGraphicsContext& g){
-    const auto title=cancelling_?wxString(wxS("正在安全停止…")):wxString(wxS("正在准备原助理"));
+    const auto title=cancelling_?wxString(wxS("正在安全停止…")):wxString(BrandText(wxS("正在准备原助理")));
     ui::Text(g,{wxS("安装进行中"),{Left,107},12,ui::Accent,true});
     ui::Text(g,{title,{Left,140},25,ui::Ink,true});
     auto detail=wxString::FromUTF8(snapshot_.detail);

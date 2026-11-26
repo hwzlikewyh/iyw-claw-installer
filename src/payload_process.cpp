@@ -27,7 +27,7 @@ bool UnderApp(const std::wstring& path,const fs::path& root) {
     return path.size()>prefix.size()&&CompareStringOrdinal(path.data(),static_cast<int>(prefix.size()),prefix.data(),static_cast<int>(prefix.size()),TRUE)==CSTR_EQUAL;
 }
 bool UnderRuntime(const std::wstring& path) {
-    const auto prefix=(UserHome()/".iyw-claw/runtime").wstring()+L"\\";
+    const auto prefix=(UserHome()/setup::Brand().userDirectory/"runtime").wstring()+L"\\";
     return path.size()>prefix.size()&&CompareStringOrdinal(path.data(),static_cast<int>(prefix.size()),prefix.data(),static_cast<int>(prefix.size()),TRUE)==CSTR_EQUAL;
 }
 struct Process {

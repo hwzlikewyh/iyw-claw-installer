@@ -56,7 +56,7 @@ std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) 
     request.accessToken = values.find("token") != values.end() ? values.at("token") : values["access-token"];
     request.silent = silent;
     request.acceptedHandoff = accepted;
-    if (request.channel != "stable" ||
+    if ((request.channel != "stable" && request.channel != "beta") ||
         (!request.releaseId.empty() && request.releaseId.find_first_not_of("0123456789") != std::string::npos))
         throw std::runtime_error("更新通道或发布身份不受支持。");
     request.release.version = required("version");
@@ -65,6 +65,7 @@ std::optional<setup::UpdateRequest> ParseUpdateRequest(int argc, wxChar** argv) 
     request.release.signature = values["signature"];
     request.release.packageKind=values["package-kind"];
     request.release.releaseId=request.releaseId;
+    request.release.channel=request.channel;
     if(!request.release.packageKind.empty()&&request.release.packageKind!="nsis"&&request.release.packageKind!="app_payload_zip")throw std::runtime_error("不支持此更新包类型。");
     if(request.release.packageKind=="app_payload_zip"&&request.release.signature.empty())throw std::runtime_error("应用载荷缺少发布签名。");
     if(values.count("parent-pid")) {
@@ -100,7 +101,7 @@ bool CanStartInstallation(const std::optional<setup::UpdateRequest>& request) {
     } catch (const std::exception& error) {
         if (request && request->parentPid) setup::ReportUpdateFailure(*request, error.what());
         if (!request || !request->silent)
-            wxMessageBox(wxString::FromUTF8(error.what()), wxS("原助理安装向导"), wxOK | wxICON_WARNING);
+            wxMessageBox(wxString::FromUTF8(error.what()), BrandText(wxS("原助理安装向导")), wxOK | wxICON_WARNING);
         return false;
     }
 }
@@ -114,6 +115,7 @@ class InstallerApp : public wxApp {
 public:
     int OnRun() override { return capabilityMode_ ? processResult_ : wxApp::OnRun(); }
     bool OnInit() override {
+        setup::PrepareBrandEnvironment();
 #ifdef _WIN32
         // 更新调用继承的 app 工作目录会被本进程锁定，必须在线程启动前释放。
         try {
@@ -123,7 +125,7 @@ public:
                 wxS("无法启动安装向导"), wxOK | wxICON_ERROR);
             return false;
         }
-        (void)SetCurrentProcessExplicitAppUserModelID(L"app.iywclaw.installer");
+        (void)SetCurrentProcessExplicitAppUserModelID((setup::Brand().identifierW + L".installer").c_str());
         if(argc==4&&wxString(argv[1])==wxS("--elevated-worker")) {
             capabilityMode_=true;
             try {
@@ -142,13 +144,15 @@ public:
         }
         if(argc==2&&wxString(argv[1])==wxS("--capabilities")) {
             std::cout << "{\"protocol\":2,\"payload\":\"app_payload_zip\",\"target\":\"windows\",\"arch\":\"x86_64\","
-                "\"nsis_targets\":[\"windows/x86_64\",\"windows/i686\"]}" << std::endl;
+                "\"runtime_branding\":1,\"nsis_targets\":[\"windows/x86_64\",\"windows/i686\"]}" << std::endl;
             capabilityMode_=true;
             return true;
         }
         if(argc==3&&wxString(argv[1])==wxS("--uninstall-root")) {
-            if(wxMessageBox(wxS("卸载原助理应用？会保留项目、会话、配置和运行环境。"),wxS("卸载原助理"),wxYES_NO|wxNO_DEFAULT)!=wxYES)return false;
-            try{setup::UninstallDirect(setup::fs::path(wxString(argv[2]).ToStdWstring()));wxMessageBox(wxS("原助理应用已卸载，用户数据已保留。"),wxS("卸载完成"));}
+            try{setup::LoadInstalledBrand(setup::fs::path(wxString(argv[2]).ToStdWstring()));}
+            catch(const std::exception& error){wxMessageBox(wxString::FromUTF8(error.what()),wxS("卸载未完成"),wxOK|wxICON_ERROR);return false;}
+            if(wxMessageBox(BrandText(wxS("卸载原助理应用？会保留项目、会话、配置和运行环境。")),BrandText(wxS("卸载原助理")),wxYES_NO|wxNO_DEFAULT)!=wxYES)return false;
+            try{setup::UninstallDirect(setup::fs::path(wxString(argv[2]).ToStdWstring()));wxMessageBox(BrandText(wxS("原助理应用已卸载，用户数据已保留。")),wxS("卸载完成"));}
             catch(const std::exception& error){wxMessageBox(wxString::FromUTF8(error.what()),wxS("卸载未完成"),wxOK|wxICON_ERROR);}
             return false;
         }
@@ -157,13 +161,20 @@ public:
     }
 private:
     bool OpenWizard() {
-        SetAppName(wxS("原助理安装向导"));
-        SetAppDisplayName(wxS("原助理安装向导"));
-        instance_=std::make_unique<wxSingleInstanceChecker>("yuan-assistant-setup-"+wxGetUserId());
+        std::optional<setup::UpdateRequest> request;
+        try {
+            request=ParseUpdateRequest(argc,argv);
+            if(request)setup::LoadInstalledBrand(request->destination);
+        } catch(const std::exception& error) {
+            wxMessageBox(wxString::FromUTF8(error.what()),wxS("无法启动安装向导"),wxOK|wxICON_ERROR);
+            return false;
+        }
+        SetAppName(BrandText(wxS("原助理安装向导")));
+        SetAppDisplayName(BrandText(wxS("原助理安装向导")));
+        instance_=std::make_unique<wxSingleInstanceChecker>(wxString::FromUTF8(setup::Brand().product + "-setup-")+wxGetUserId());
         if(instance_->IsAnotherRunning())return false;
         wxInitAllImageHandlers();
         try {
-            auto request = ParseUpdateRequest(argc, argv);
 #ifdef _WIN32
             if (!CanStartInstallation(request)) return false;
             std::optional<setup::fs::path> resumeRoot;

@@ -86,12 +86,12 @@ bool EnvironmentWasCommitted(FileWork& work) {
     if(work.environmentTransaction.empty())return false;
     if(work.environmentTransaction.size()!=32||work.environmentTransaction.find_first_not_of("0123456789abcdef")!=std::string::npos)
         throw std::runtime_error("环境事务编号无效。");
-    const auto receipt=UserHome()/".iyw-claw/inventory/transactions"/(work.environmentTransaction+".json");
+    const auto receipt=UserHome()/setup::Brand().userDirectory/"inventory/transactions"/(work.environmentTransaction+".json");
     if(fs::exists(receipt)) {
         const auto value=ReadJSON(receipt);
         if(value.value("schemaVersion",0)==2&&value.at("generation")==work.environmentTransaction&&value.at("state")=="committed")return true;
     }
-    const auto current=UserHome()/".iyw-claw/inventory/environment-current.json";
+    const auto current=UserHome()/setup::Brand().userDirectory/"inventory/environment-current.json";
     if(!fs::exists(current))return false;
     // 环境库存包含较多组件文件记录；仅流式解析，不重新扫描组件内容。
     if(fs::file_size(current)>64*MiB)throw std::runtime_error("环境清单超过读取上限。");
