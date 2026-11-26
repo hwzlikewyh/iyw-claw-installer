@@ -177,7 +177,7 @@ void RegisterDirectInstall(const Release& release,FileWork& work){
     Set(setup::Brand().uninstallKey.c_str(),L"UninstallString",L"\""+uninstall.wstring()+L"\" --uninstall-root \""+root.wstring()+L"\"");
     const auto icon=InstalledBrandIcon(root);
     Set(setup::Brand().uninstallKey.c_str(),L"DisplayIcon",icon.wstring());
-    Set(L"Software\\Classes\\" + setup::Brand().schemeW,L"",L"URL:原助理");Set(L"Software\\Classes\\" + setup::Brand().schemeW,L"URL Protocol",L"");
+    Set(L"Software\\Classes\\" + setup::Brand().schemeW,L"",L"URL:"+setup::Brand().nameW);Set(L"Software\\Classes\\" + setup::Brand().schemeW,L"URL Protocol",L"");
     Set(L"Software\\Classes\\" + setup::Brand().schemeW + L"\\shell\\open\\command",L"",L"\""+exe.wstring()+L"\" \"%1\"");
     const auto status=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
     if(FAILED(status))throw std::runtime_error("无法初始化快捷方式服务。");

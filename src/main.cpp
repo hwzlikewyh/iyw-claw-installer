@@ -171,7 +171,7 @@ private:
         }
         SetAppName(BrandText(wxS("原助理安装向导")));
         SetAppDisplayName(BrandText(wxS("原助理安装向导")));
-        instance_=std::make_unique<wxSingleInstanceChecker>(wxString::FromUTF8(setup::Brand().product + "-setup-")+wxGetUserId());
+        instance_=std::make_unique<wxSingleInstanceChecker>(wxString::FromUTF8(std::string("iyw-claw-setup-")+setup::Brand().id+"-")+wxGetUserId());
         if(instance_->IsAnotherRunning())return false;
         wxInitAllImageHandlers();
         try {
