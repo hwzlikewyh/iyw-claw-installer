@@ -9,6 +9,7 @@
 #define IYW_BRAND_ID "iyw"
 #define IYW_PRODUCT "iyw-claw"
 #define IYW_PRODUCT_W L"iyw-claw"
+#define IYW_INSTALL_PRODUCT "iyw-claw"
 #define IYW_IDENTIFIER "app.iywclaw"
 #define IYW_IDENTIFIER_W L"app.iywclaw"
 #define IYW_SCHEME "iyw-assistant"

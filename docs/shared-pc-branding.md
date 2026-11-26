@@ -7,7 +7,7 @@
 现有配置为 `brands/iyw/brand.json` 和 `brands/yun/brand.json`。名称使用 `displayName`，PNG 文件使用相对于配置文件的 `logo` 路径。`brandId` 是稳定的本机隔离标识，发布后不得随名称变化而修改。
 
 ```sh
-python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.370 --output .cache/yun
+python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.372 --output .cache/yun
 python scripts/build-candidate.py --kind installer --repository . --brand-directory .cache/yun -- <现有平台构建命令>
 ```
 
