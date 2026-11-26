@@ -10,7 +10,7 @@ import sys
 def application_environment():
     environment = dict(os.environ)
     for name in ["IYW_BRAND_ID", "IYW_BRAND_NAME", "IYW_BRAND_PRODUCT",
-                 "IYW_BRAND_IDENTIFIER", "IYW_BRAND_SCHEME", "IYW_RELEASE_ID",
+                 "IYW_BRAND_IDENTIFIER", "IYW_BRAND_SCHEME", "IYW_RELEASE_ID", "IYW_PROMOTION_CHANNEL",
                  "NEXT_PUBLIC_IYW_BRAND_NAME", "NEXT_PUBLIC_IYW_BRAND_LOGO",
                  "NEXT_PUBLIC_IYW_BRAND_SCHEME", "IYW_BRAND_ASSETS"]:
         environment.pop(name, None)
@@ -46,7 +46,8 @@ def main():
         "IYW_BRAND_ID": brand["brandId"],
         "IYW_BRAND_NAME": brand["displayName"], "IYW_BRAND_PRODUCT": brand["productKey"],
         "IYW_BRAND_IDENTIFIER": brand["identifier"], "IYW_BRAND_SCHEME": brand["urlScheme"],
-        "IYW_RELEASE_ID": brand["releaseId"], "NEXT_PUBLIC_IYW_BRAND_NAME": brand["displayName"],
+        "IYW_RELEASE_ID": brand["releaseId"], "IYW_PROMOTION_CHANNEL": brand.get("promotionChannel", "stable"),
+        "NEXT_PUBLIC_IYW_BRAND_NAME": brand["displayName"],
         "NEXT_PUBLIC_IYW_BRAND_LOGO": "/icon-128x128.png",
         "NEXT_PUBLIC_IYW_BRAND_SCHEME": brand["urlScheme"],
     })
