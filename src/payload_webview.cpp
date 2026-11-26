@@ -61,7 +61,7 @@ void ShowWebViewStep(FileWork& work, const std::string& detail) {
 bool InstallWebView(const fs::path& installer, const fs::path& log, FileWork& work) {
     auto lock=OpenLocked(installer);
     VerifyMicrosoftSignature(installer);
-    const auto code=RunCommand({installer,{"/silent","/install"},log,0},[&]{Advance(work,0);});
+    const auto code=RunCommand({installer,{"/silent","/install"},log,0,work.staging},[&]{Advance(work,0);});
     const auto result=std::to_string(static_cast<DWORD>(code));
     work.progress.events.push_back("WebView2 安装器退出码 "+result+"，日志 "+log.filename().u8string());
     // Edge Update 可能在子进程退出后才完成注册，成功回执要以运行库可见为准。

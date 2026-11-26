@@ -9,7 +9,7 @@ inline constexpr unsigned MaxPayloadFiles = 100000;
 void VerifyPayload(const Release& release, FileWork& work);
 fs::path PayloadRelative(const std::string& value);
 void RequirePlainPath(const fs::path& path);
-void ExtractPayload(FileWork& work);
+void ExtractPayload(FileWork& work, const fs::path& root);
 void ValidatePayloadTree(const fs::path& root, const Release& release, FileWork& work);
 void BeginDirectInstall(const Release& release, FileWork& work);
 void PrepareDirectPayload(const Release& release, FileWork& work);

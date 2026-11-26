@@ -1,4 +1,5 @@
 #include "payload.h"
+#include "payload_directory.h"
 #include "windows_support.h"
 #include "command.h"
 #include <fstream>
@@ -57,13 +58,13 @@ void RecoverLegacyInstall(FileWork& work) {
     fs::path partial;
     if (preserve) {
         partial = marker.parent_path() / (L"incomplete-app-" + TransactionId());
-        fs::rename(app, partial);
+        MoveAppDirectory(app, partial);
         work.progress.events.push_back("已保留上次安装的应用文件：" + partial.u8string());
     }
     if (hasBackup) {
-        try { fs::rename(backup, app); }
-        catch (const fs::filesystem_error&) {
-            if (!partial.empty()) fs::rename(partial, app);
+        try { MoveAppDirectory(backup, app); }
+        catch (const std::runtime_error&) {
+            if (!partial.empty()) MoveAppDirectory(partial, app);
             throw;
         }
     }
@@ -107,10 +108,10 @@ void Rollback(FileWork& work) {
     const auto app=work.progress.destination/"app",backup=work.deployment/"previous-app";
     if(!selected.value("reused",false)) {
         if(fs::exists(backup)) {
-            if(fs::exists(app))fs::rename(app,work.deployment/"failed-app");
-            fs::rename(backup,app);
+            if(fs::exists(app))MoveAppDirectory(app,work.deployment/"failed-app");
+            MoveAppDirectory(backup,app);
         } else if(!selected.at("oldApp").get<bool>()&&fs::exists(app)) {
-            fs::rename(app,work.deployment/"failed-app");
+            MoveAppDirectory(app,work.deployment/"failed-app");
         }
     }
     RestoreDirectRegistration(work);
@@ -128,15 +129,22 @@ void ConfirmCommit(FileWork& work) {
     // 回收失败不改变已经提交的结果，保留有明确所有权的旧 app 备份。
     try{RemoveOwnedTree(work.deployment/"previous-app");}
     catch(const std::exception&){work.progress.events.push_back("安装成功，旧应用备份暂留 staging。");}
+    // 备用副本已生效，尽量释放被占用的原暂存文件。
+    try { RemoveOwnedTree(work.deployment/"incoming/app"); }
+    catch (const std::exception&) { work.progress.events.push_back("安装成功，仍被占用的暂存文件保留在 staging。"); }
+    try { RemoveOwnedTree(work.deployment/"replacement"); }
+    catch (const std::exception&) { work.progress.events.push_back("安装成功，旧版本复制暂留 staging。"); }
 }
 void RecoverEnvironment(FileWork& work) {
     const auto staged=work.deployment/"incoming/app/iyw-environment.exe";
-    const auto helper=fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
+    const auto state=ReadJSON(Journal(work)).at("state").get<std::string>();
+    const bool swapped=state=="swapped"||state=="environment-prepared"||state=="environment-committing";
+    const auto helper=!swapped&&fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
     VerifyEnvironmentBinary(helper);
     if(work.staging.empty())work.staging=CreateStaging();
     if(work.environmentTransaction.size()!=32||work.environmentTransaction.find_first_not_of("0123456789abcdef")!=std::string::npos)
         throw std::runtime_error("恢复环境事务编号无效。");
-    const auto code=RunCommand({helper,{"install","--phase","recover","--transaction-id",work.environmentTransaction},work.staging/"environment-recover.log",120});
+    const auto code=RunCommand({helper,{"install","--phase","recover","--transaction-id",work.environmentTransaction},work.staging/"environment-recover.log",120,work.staging});
     if(code!=0)throw std::runtime_error("环境事务恢复失败，已保留应用与环境备份。");
 }
 void LoadRecovery(FileWork& work) {
@@ -222,9 +230,9 @@ void BeginDirectInstall(const Release& release,FileWork& work) {
     if(fs::exists(app)&&!fs::is_empty(app))VerifySignature(app/"iyw-claw.exe");
     WriteDeploymentSelection(release,work,false);
     SaveDeployment(work,"prepared");
-    if(fs::exists(app))fs::rename(app,work.deployment/"previous-app");
+    if(fs::exists(app))MoveAppDirectory(app,work.deployment/"previous-app");
     SaveDeployment(work,"backed-up");
-    fs::rename(work.deployment/"incoming/app",app);
+    ActivatePreparedApp(release,work);
     work.installerStarted=true;SaveDeployment(work,"swapped");
     work.progress.events.push_back("新向导直接部署应用文件，等待环境提交。");
 }
@@ -235,7 +243,8 @@ void PrepareDirectPayload(const Release& release,FileWork& work) {
     RequirePlainPath(work.deployment);fs::create_directories(work.deployment);
     BeginStage(work,Phase::Verifying);
     work.progress.detail="正在退出应用前预先校验应用载荷与 WebView2";work.job.Publish(work.progress);
-    ExtractPayload(work);ValidatePayloadTree(work.deployment/"incoming",release,work);EnsureWebView(work);
+    const auto incoming = work.deployment/"incoming";
+    ExtractPayload(work,incoming);ValidatePayloadTree(incoming,release,work);EnsureWebView(work);
     CheckCancel(work.job);
 }
 void FinishDirectInstall(FileWork& work,bool success) {
@@ -258,7 +267,7 @@ void FinishDirectInstall(FileWork& work,bool success) {
     }
     SaveDeployment(work,"environment-committing");
     const auto helper=EnvironmentHelper(work.progress.destination);
-    const auto code=RunCommand({helper,{"install","--phase","commit","--transaction-id",work.environmentTransaction},work.staging/"environment-commit.log",0},[&]{Advance(work,0);});
+    const auto code=RunCommand({helper,{"install","--phase","commit","--transaction-id",work.environmentTransaction},work.staging/"environment-commit.log",0,work.staging},[&]{Advance(work,0);});
     if(!EnvironmentWasCommitted(work)) {
         if(code!=0){RecoverEnvironment(work);SaveDeployment(work,"environment-prepared");throw std::runtime_error("环境提交失败，应用将恢复旧版本。");}
         throw std::runtime_error("环境助手未生成正确提交回执。");

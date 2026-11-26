@@ -28,7 +28,7 @@ void PrepareDirectEnvironment(const Release& release, FileWork& work, bool befor
     const auto helper=!work.deployment.empty()&&fs::is_regular_file(staged)?staged:EnvironmentHelper(work.progress.destination);
     VerifyEnvironmentBinary(helper);
     const auto output=work.staging/"environment-identity.json";
-    if(RunCommand({helper,{"--identity"},output,15})!=0)throw std::runtime_error("环境助手无法运行。");
+    if(RunCommand({helper,{"--identity"},output,15,work.staging})!=0)throw std::runtime_error("环境助手无法运行。");
     const auto identity=nlohmann::json::parse(ReadOutput(output));
     if(identity.at("distributionTarget")!="windows"||identity.at("target")!="x86_64-pc-windows-msvc"||identity.value("installerProtocol",0)!=2)
         throw std::runtime_error("环境助手系统或架构不匹配。");
@@ -36,7 +36,7 @@ void PrepareDirectEnvironment(const Release& release, FileWork& work, bool befor
     const auto progressFile = work.staging / "environment-progress.ini";
     const std::vector<std::string> args{"install","--phase","prepare","--app-version",release.version,"--progress-file",progressFile.u8string()};
     work.progress.detail="快速核对已有环境，只准备缺失或变更组件";work.job.Publish(work.progress);
-    const auto code=RunCommand({helper,args,work.progress.logPath,0},[&]{PollEnvironmentProgress(work);});
+    const auto code=RunCommand({helper,args,work.progress.logPath,0,work.staging},[&]{PollEnvironmentProgress(work);});
     if(code!=0)
         throw std::runtime_error("运行环境准备失败，退出码 "+std::to_string(code)+"。详见本次安装目录中的 environment-prepare.log.stderr。");
     // 与正式安装器共用本次助手的进度回执，避免读取全局 pending 指针。

@@ -68,8 +68,8 @@ void RequirePlainPath(const fs::path& path) {
             throw std::runtime_error("无法验证安装目录权限。");
     }
 }
-void ExtractPayload(FileWork& work) {
-    const auto root=work.deployment/"incoming";RequirePlainPath(root);
+void ExtractPayload(FileWork& work, const fs::path& root) {
+    RequirePlainPath(root);
     if(!fs::create_directory(root))throw std::runtime_error("载荷暂存目录已存在。");
     std::unique_ptr<archive,decltype(&archive_read_free)> reader(archive_read_new(),archive_read_free);
     archive_read_support_format_zip(reader.get());
@@ -78,7 +78,7 @@ void ExtractPayload(FileWork& work) {
     archive_entry* entry=nullptr;std::uint64_t total=0;std::set<std::wstring> paths;int status;
     auto published=std::chrono::steady_clock::now();
     while((status=archive_read_next_header(reader.get(),&entry))==ARCHIVE_OK) {
-        CheckCancel(work.job);
+        if(work.progress.cancellable)CheckCancel(work.job);
         const auto* name=archive_entry_pathname_utf8(entry);
         if(!name||archive_entry_filetype(entry)!=AE_IFREG||archive_entry_symlink(entry)||archive_entry_hardlink(entry)||archive_entry_is_encrypted(entry))
             throw std::runtime_error("载荷仅允许普通、未加密文件。");
