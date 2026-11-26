@@ -16,9 +16,10 @@ def main():
     args = parser.parse_args()
     version = re.search(r"VERSION ([0-9.]+) LANGUAGES", (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")).group(1)
     directory = ROOT / ".cache" / ("ci-brand-" + args.brand)
+    release = ["--release-id", os.environ["IYW_CANDIDATE_RELEASE_ID"]] if os.environ.get("IYW_CANDIDATE_RELEASE_ID") else []
     subprocess.run([sys.executable, str(ROOT / "scripts/prepare-brand.py"),
                     "--config", str(ROOT / "brands" / args.brand / "brand.json"),
-                    "--version", version, "--output", str(directory)], check=True)
+                    "--version", version, "--output", str(directory), *release], check=True)
     resources = directory / "installer-resources"
     subprocess.run([sys.executable, str(ROOT / "scripts/apply-brand.py"),
                     str(directory), "--output", str(resources)], check=True)

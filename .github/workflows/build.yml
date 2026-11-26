@@ -2,6 +2,10 @@ name: Build installers
 on:
   workflow_dispatch:
     inputs:
+      candidate_release_id:
+        description: Optional existing beta release ID of the common PC package
+        type: string
+        required: false
       sign_windows:
         description: Sign on this repository runner (candidate signing uses the PC repository)
         type: boolean
@@ -13,6 +17,7 @@ permissions:
   contents: read
 env:
   PYTHONIOENCODING: utf-8
+  IYW_CANDIDATE_RELEASE_ID: ${{ inputs.candidate_release_id }}
 concurrency:
   group: installers-${{ github.ref }}
   cancel-in-progress: false

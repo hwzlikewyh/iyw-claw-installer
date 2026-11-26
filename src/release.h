@@ -15,6 +15,7 @@ fs::path CreateStaging();
 Release ParseRelease(const std::string& body);
 bool ValidateRequestedRelease(const Release& release, std::string& error);
 Release ResolveRelease(const Platform& platform, InstallJob& job);
+void RequireBrandRuntime(const Release& release);
 Release ResolveCandidate(const Platform& platform, InstallJob& job);
 Release ResolveChannelRelease(const Platform& platform, InstallJob& job,const std::string& channel);
 Release ResolveStableRelease(const Platform& platform, InstallJob& job);

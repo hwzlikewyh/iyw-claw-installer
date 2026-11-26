@@ -86,6 +86,7 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     CheckSystem(work); CheckEnvironment(work);
     BeginStage(work, Phase::Resolving);
     const auto release = request ? request->release : ResolveRelease(platform, work.job);
+    RequireBrandRuntime(release);
     wxSetEnv("IYW_CLAW_RELEASE_CHANNEL",wxString::FromUTF8(release.channel));
 #ifdef _WIN32
     work.directPayload=release.packageKind==PayloadKind;
