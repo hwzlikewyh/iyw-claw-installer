@@ -86,7 +86,10 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     CheckSystem(work); CheckEnvironment(work);
     BeginStage(work, Phase::Resolving);
     const auto release = request ? request->release : ResolveRelease(platform, work.job);
-    RequireBrandRuntime(release);
+#ifdef _WIN32
+    if(Brand().id!="iyw"&&release.packageKind!="app_payload_zip")
+        throw std::runtime_error("此公共 PC 发布缺少支持品牌安装的应用载荷，请在同一发布中补齐后重试。");
+#endif
     wxSetEnv("IYW_CLAW_RELEASE_CHANNEL",wxString::FromUTF8(release.channel));
 #ifdef _WIN32
     work.directPayload=release.packageKind==PayloadKind;

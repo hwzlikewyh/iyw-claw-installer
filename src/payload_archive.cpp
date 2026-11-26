@@ -117,6 +117,7 @@ void ValidatePayloadTree(const fs::path& root, const Release& release, FileWork&
         if(entry.is_regular_file()&&entry.path()!=path&&!declared.count(Fold(fs::relative(entry.path(),root))))throw std::runtime_error("载荷存在未声明文件。");
     }
     CheckExecutable(root/"app/iyw-claw.exe",release,work);
+    RequireBrandRuntime(root/"app/iyw-claw.exe");
     VerifyEnvironmentBinary(root/"app/iyw-environment.exe");
     for(const auto* required:{"app/iyw-environment.exe","app/resources/bundle/index.html","app/xinghe-resources/runtime.json","app/native-share/config.json","app/native-share/register.ps1","app/native-share/share-resources.ps1","app/native-share/IywAssistant.ShareTarget.msix","app/installer/webview2-setup.exe"})
         if(!declared.count(Fold(fs::u8path(required))))throw std::runtime_error("应用载荷缺少必要资源。");

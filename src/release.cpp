@@ -100,11 +100,6 @@ bool ValidateRequestedRelease(const Release& release, std::string& error) {
 Release ResolveRelease(const Platform& platform, InstallJob& job) {
     return std::string(setup::Brand().releaseId).empty() ? ResolveStableRelease(platform, job) : ResolveCandidate(platform, job);
 }
-void RequireBrandRuntime(const Release& release) {
-    constexpr std::array<unsigned,3> FirstRuntimeBrandVersion{0,1,367};
-    if(Brand().id!="iyw" && Version(release.version)<FirstRuntimeBrandVersion)
-        throw std::runtime_error("当前公共 PC 版本尚不支持安装品牌配置，请先发布 0.1.367 或更新版本的公共 iyw-claw 包。");
-}
 Release ResolveStableRelease(const Platform& platform, InstallJob& job) {
     return ResolveChannelRelease(platform,job,"stable");
 }

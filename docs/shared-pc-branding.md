@@ -7,13 +7,13 @@
 现有配置为 `brands/iyw/brand.json` 和 `brands/yun/brand.json`。名称使用 `displayName`，PNG 文件使用相对于配置文件的 `logo` 路径。`brandId` 是稳定的本机隔离标识，发布后不得随名称变化而修改。
 
 ```sh
-python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.367 --output .cache/yun
+python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.370 --output .cache/yun
 python scripts/build-candidate.py --kind installer --repository . --brand-directory .cache/yun -- <现有平台构建命令>
 ```
 
 生成图标需要 Pillow。`prepare-brand.py` 也接受后台已有品牌修订导出的配置；本地配置方式不依赖品牌专用接口。
 
-CI 的 `candidate_release_id` 可绑定同一个已登记的公共 PC 测试发布。运行时品牌能力从公共 PC 0.1.367 开始，渠道向导遇到更旧版本会在下载和写入前明确提示，避免安装后仍显示原助理。这是公共包的兼容版本要求，不要求另建品牌产品。
+CI 的 `candidate_release_id` 可绑定同一个已登记的公共 PC 测试发布。向导检查已验证主程序中的 `IYW_INSTALLED_BRAND_V1` 能力标记，不用版本号猜测是否兼容。缺少能力时在部署前明确提示，避免安装后仍显示原助理。Windows 渠道安装使用同一公共发布的 `app_payload_zip`，不另建品牌产品。
 
 指定 `--release-id` 后，向导使用现有版本查询接口的 beta 通道，并核对返回的发布 ID。正式向导使用 stable。后台将同一发布晋级后，候选向导可取得同一 ID 的 stable 制品。若该候选已被其他测试版替代且不在当前 stable 中，向导明确要求取得当前配置。
 

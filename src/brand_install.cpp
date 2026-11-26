@@ -2,6 +2,7 @@
 #include "runtime-brand-assets.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <array>
 #include <stdexcept>
 #ifdef _WIN32
 #include "payload.h"
@@ -9,6 +10,22 @@
 #endif
 
 namespace setup {
+void RequireBrandRuntime(const fs::path& executable) {
+    if(Brand().id=="iyw")return;
+    constexpr const char* Capability="IYW_INSTALLED_BRAND_V1";
+    const std::string marker=Capability;
+    std::ifstream stream(executable,std::ios::binary);
+    std::array<char,64*1024> block{};
+    std::string tail;
+    while(stream) {
+        stream.read(block.data(),block.size());
+        const auto bytes=tail+std::string(block.data(),static_cast<std::size_t>(stream.gcount()));
+        if(bytes.find(marker)!=std::string::npos)return;
+        tail=bytes.substr(bytes.size()>marker.size()?bytes.size()-marker.size():0);
+    }
+    throw std::runtime_error("当前公共 PC 包尚不支持安装品牌配置，请发布兼容的公共 iyw-claw 包后重试。");
+}
+
 fs::path BrandConfigurationDirectory(const fs::path& root) {
 #ifdef __APPLE__
     return root/fs::u8path(setup::Brand().name + ".app.branding");

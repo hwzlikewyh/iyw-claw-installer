@@ -118,6 +118,7 @@ bool ReuseApplication(const Release& release,FileWork& work){
         auto appLock=OpenLocked(executable),helperLock=OpenLocked(helper);
         RequireAppVersion(executable,release.version,work);
         VerifySignature(executable);VerifySignature(helper);
+        RequireBrandRuntime(executable);
         if(work.directPayload) {
             const auto output=work.staging/"reuse-helper-identity.json";
             if(RunCommand({helper,{"--identity"},output,15})!=0)return false;

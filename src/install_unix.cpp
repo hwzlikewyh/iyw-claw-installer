@@ -54,6 +54,7 @@ void VerifyMacBundle(const fs::path& bundle,const Release& release,const fs::pat
         throw std::runtime_error("无法读取 macOS 应用版本。");
     auto version=ReadOutput(log);while(!version.empty()&&(version.back()=='\n'||version.back()=='\r'))version.pop_back();
     if(version!=release.version)throw std::runtime_error("macOS 应用版本与发布版本不匹配。");
+    RequireBrandRuntime(bundle/"Contents/MacOS/iyw-claw");
 #else
     (void)bundle;(void)release;(void)log;
 #endif
@@ -77,6 +78,7 @@ void InstallPackage(const Release& release,FileWork& work){
     const auto source=work.staging/"squashfs-root";
     if(!fs::is_regular_file(source/"AppRun")||!fs::is_regular_file(source/"usr/bin/iyw-environment"))
         throw std::runtime_error("安装包缺少应用或环境助手。");
+    RequireBrandRuntime(source/"usr/bin/iyw-claw");
     SwapApp(source,work);
 #endif
 }
@@ -99,6 +101,8 @@ bool ReuseApplication(const Release& release,FileWork& work){
         !fs::is_regular_file(EnvironmentHelper(work.progress.destination)))return false;
     const auto saved=ReadOutput(receipt);
     if(saved!=release.version+"\n"+release.sha256+"\n")return false;
+    try{RequireBrandRuntime(work.progress.destination/"app/usr/bin/iyw-claw");}
+    catch(const std::exception&){return false;}
 #endif
     work.progress.events.push_back("已安装同一稳定版，跳过主程序下载与重装。");return true;
 }
