@@ -125,18 +125,30 @@ bool RestoreShellResources(FileWork& work){
     }
     return true;
 }
-constexpr char RegisterMainIdentity[]=R"ps($ErrorActionPreference='Stop'
-if ([Environment]::OSVersion.Version.Build -lt 19041) { exit 23 }
-$env:PSModulePath=[IO.Path]::Combine($PSHOME,'Modules')
-$share=[Environment]::CurrentDirectory
-$app=[IO.Directory]::GetParent($share).FullName
-$config=Get-Content -LiteralPath (Join-Path $share 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-$installed=Get-AppxPackage -Name 'IywAssistant.Desktop'
-if (!$installed -or $installed.Version -ne [version]$config.packageVersion -or $installed.Status -ne 'Ok') {
-    Add-AppxPackage -Path (Join-Path $share 'IywAssistant.ShareTarget.msix') -ExternalLocation $app -ForceUpdateFromAnyVersion -ForceTargetApplicationShutdown
+constexpr char RegisterMainIdentity[]=
+#include "native_identity_script.inc"
+;
+std::string IdentityFailure(const fs::path& log,int code){
+    constexpr std::size_t MaxErrorBytes=8192;
+    std::ifstream errors(fs::path(log.wstring()+L".stderr"),std::ios::binary);
+    std::string detail(MaxErrorBytes,'\0');errors.read(detail.data(),detail.size());
+    detail.resize(static_cast<std::size_t>(errors.gcount()));
+    if(detail.size()==MaxErrorBytes){const auto end=detail.find_last_of('\n');detail.resize(end==std::string::npos?0:end);}
+    return "Windows 主程序身份修复或启动检查失败。退出码："+std::to_string(code)+
+        "；日志："+log.filename().u8string()+".stderr"+(detail.empty()?"":"\n"+detail);
 }
-& (Join-Path $share 'register.ps1')
-exit $LASTEXITCODE)ps";
+int RunMainIdentity(FileWork& work,const fs::path& log,bool restore){
+    if(work.staging.empty())work.staging=CreateStaging();
+    const auto script=work.staging/"native-identity.ps1",state=work.deployment/"native-identity.json";
+    RequirePlainPath(script);RequirePlainPath(state);RequirePlainPath(fs::path(state.wstring()+L".new"));
+    if(fs::exists(state)&&fs::file_size(state)>MiB)throw std::runtime_error("应用身份备份记录过大。");
+    {std::ofstream file(script,std::ios::binary);file<<"\xEF\xBB\xBF"<<RegisterMainIdentity;
+        file.close();if(!file)throw std::runtime_error("无法准备应用身份修复脚本。");}
+    std::vector<std::string> args{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass",
+        "-File",script.u8string(),"-AppDirectory",(work.progress.destination/"app").u8string(),"-StateFile",state.u8string()};
+    if(restore)args.push_back("-Restore");
+    return RunCommand({PowerShell(),args,log,180,work.staging});
+}
 void RegisterNativeShare(FileWork& work){
     const auto script=work.progress.destination/fs::u8path("app/native-share/register.ps1");
     const bool required=RestoreShellResources(work);
@@ -145,10 +157,10 @@ void RegisterNativeShare(FileWork& work){
         RequirePlainPath(script);
         if(!required&&!fs::is_regular_file(script))return;
         constexpr int unsupportedIdentity=23;
-        const auto code=RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass",
-            required?"-Command":"-File",required?RegisterMainIdentity:script.u8string()},log,180,script.parent_path()});
+        const auto code=required?RunMainIdentity(work,log,false):RunCommand({PowerShell(),
+            {"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string()},log,180,script.parent_path()});
         if(required&&code==unsupportedIdentity){work.progress.events.push_back("此 Windows 版本不支持系统分享身份，已跳过。");return;}
-        if(required&&code!=0)throw std::runtime_error("Windows 未完成主程序身份注册或启动检查。详见 native-share-register.log.stderr。退出码："+std::to_string(code));
+        if(required&&code!=0)throw std::runtime_error(IdentityFailure(log,code));
         work.progress.events.push_back(code==0?"系统分享入口已为当前用户注册。":"系统分享入口暂未注册，原助理启动时会自动检查并重试。注册退出码="+std::to_string(code));
     }catch(const std::exception& error){if(required)throw;work.progress.events.push_back(std::string("系统分享入口暂未注册，原助理启动时会自动检查并重试：")+error.what());}
 }
@@ -186,6 +198,17 @@ void RestoreDirectRegistration(FileWork& work){
         if(saved.at("shortcuts").at(index).get<bool>())fs::copy_file(backup,target,fs::copy_options::overwrite_existing);
         else fs::remove(target);++index;
     }
+    if(fs::exists(work.deployment/"native-identity.json")){
+        try{
+            if(work.staging.empty())work.staging=CreateStaging();
+            const auto log=work.staging/"native-share-restore.log";
+            const auto code=RunMainIdentity(work,log,true);
+            if(code!=0)throw std::runtime_error(IdentityFailure(log,code));
+            work.progress.events.push_back("原 Windows 应用身份已恢复。");
+        }catch(const std::exception& error){
+            work.progress.events.push_back(std::string("应用文件已回滚，原身份暂未恢复；重装时将再次修复：")+error.what());
+        }
+    }
 }
 void UninstallDirect(const fs::path& root){
     if(root.empty()||!root.is_absolute()||root==root.root_path()||fs::path(Read(InstallKey,L"InstallRoot"))!=root)throw std::runtime_error("卸载目录与已登记应用不匹配。");
@@ -193,9 +216,10 @@ void UninstallDirect(const fs::path& root){
     RequirePlainPath(root);InstallJob job;Snapshot state;state.destination=root;
     FileWork work{job,{},state,std::chrono::steady_clock::now(),{}};
     RecoverDirectInstall(work);StopInstalledProcesses(root);
-    if(fs::exists(root/"app")&&!fs::is_empty(root/"app"))VerifySignature(root/"app/iyw-claw.exe");
+    const bool hasMain=fs::is_regular_file(root/"app/iyw-claw.exe");
+    if(hasMain)VerifySignature(root/"app/iyw-claw.exe");
     const auto script=root/"app/native-share/register.ps1";
-    if(fs::exists(script)){
+    if(hasMain&&fs::is_regular_file(script)){
         work.staging=CreateStaging();
         if(RunCommand({PowerShell(),{"-NoLogo","-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script.u8string(),"-Unregister"},work.staging/"unregister.log",120})!=0)throw std::runtime_error("系统分享入口未移除，卸载已停止。");
     }

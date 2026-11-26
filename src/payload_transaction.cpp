@@ -220,6 +220,21 @@ void WriteDeploymentSelection(const Release& release,FileWork& work,bool reused)
     WriteDurableJSON(work.deployment/"selection.json",{{"root",work.progress.destination.lexically_normal().u8string()},
         {"version",release.version},{"sha256",release.sha256},{"oldApp",fs::exists(work.progress.destination/"app")},{"reused",reused},{"presets",presets}});
 }
+void CheckPreviousApplication(FileWork& work) {
+    const auto app=work.progress.destination/"app";RequirePlainPath(app);
+    if(!fs::exists(app))return;
+    if(!fs::is_directory(app))throw std::runtime_error("旧应用路径不是目录，已保留安装现场。");
+    const auto executable=app/"iyw-claw.exe";RequirePlainPath(executable);
+    if(!fs::is_regular_file(executable)) {
+        work.progress.events.push_back("检测到缺少主程序的残留目录，将备份残留文件并重新安装。");
+        return;
+    }
+    try{VerifySignature(executable);}
+    catch(const std::exception& error){
+        // 旧文件只备份、不执行；新载荷仍由 ValidatePayloadTree 完整验签。
+        work.progress.events.push_back(std::string("旧主程序校验失败，将备份后使用已验证的新包重装：")+error.what());
+    }
+}
 void BeginDirectInstall(const Release& release,FileWork& work) {
     if(CurrentPlatform().target!="windows"||CurrentPlatform().arch!="x86_64")throw std::runtime_error("当前系统不支持该应用载荷。");
     if(work.deployment.empty())PrepareDirectPayload(release,work);
@@ -227,7 +242,7 @@ void BeginDirectInstall(const Release& release,FileWork& work) {
     BeginStage(work,Phase::Installing);CheckCancel(work.job);
     StopInstalledProcesses(root);
     const auto app=root/"app";
-    if(fs::exists(app)&&!fs::is_empty(app))VerifySignature(app/"iyw-claw.exe");
+    CheckPreviousApplication(work);
     WriteDeploymentSelection(release,work,false);
     SaveDeployment(work,"prepared");
     if(fs::exists(app))MoveAppDirectory(app,work.deployment/"previous-app");

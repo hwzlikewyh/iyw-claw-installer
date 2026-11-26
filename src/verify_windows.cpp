@@ -82,7 +82,13 @@ void VerifyPublisher(const fs::path& path, const wchar_t* publisher,
         }
     }
     trust.dwStateAction = WTD_STATEACTION_CLOSE; WinVerifyTrust(nullptr, &action, &trust);
-    if (result != ERROR_SUCCESS) throw std::runtime_error("安装包数字签名校验失败。系统错误：" + std::to_string(result));
+    if (result != ERROR_SUCCESS) {
+        std::ostringstream detail;
+        detail << "文件数字签名校验失败：" << path.u8string() << "；系统错误：" << result
+            << "（0x" << std::hex << std::uppercase << static_cast<unsigned long>(result) << "）";
+        if(result==CRYPT_E_FILE_ERROR)detail << "；Windows 无法读取或写入待校验文件。";
+        throw std::runtime_error(detail.str());
+    }
     if (!publisherMatches) throw std::runtime_error(mismatch);
 }
 }
