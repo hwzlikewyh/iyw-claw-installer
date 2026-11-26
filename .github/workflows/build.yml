@@ -11,6 +11,8 @@ on:
     paths: ['src/**', 'resources/**', 'vendor/**', 'scripts/**', 'CMakeLists.txt', '.github/workflows/build.yml']
 permissions:
   contents: read
+env:
+  PYTHONIOENCODING: utf-8
 concurrency:
   group: installers-${{ github.ref }}
   cancel-in-progress: false

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 import urllib.parse
 import urllib.request
 
@@ -139,4 +140,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
     main()
