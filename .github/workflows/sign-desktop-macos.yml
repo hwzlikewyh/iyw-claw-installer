@@ -1,0 +1,106 @@
+name: Build Developer ID desktop candidate
+on: workflow_call
+permissions:
+  contents: read
+  actions: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-apple-darwin, aarch64-apple-darwin]
+    runs-on: macos-15
+    timeout-minutes: 300
+    env:
+      # 固定审核过的应用源码和前端，只在本仓库的临时钥匙串中使用签名身份。
+      PC_SOURCE: 3fdd5ec0396365cecbc130e6dd78313293f7a613
+      FRONTEND_ID: '15167066940'
+      FRONTEND_SHA256: c3c3c0e3e1fce677865d3e8d0f7ff8969b537416cd96000066b90508ebbd6b32
+      APPLE_TEAM_ID: 393H57RCN6
+      TAURI_TARGET_TRIPLE: ${{ matrix.target }}
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '64'
+      CARGO_PROFILE_RELEASE_LTO: 'off'
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: hwzlikewyh/iyw-claw
+          ref: ${{ env.PC_SOURCE }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          shared-key: pc-${{ matrix.target }}
+          workspaces: src-tauri -> target
+          cache-workspace-crates: false
+      - name: Prepare the verified frontend and desktop dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PC_SOURCE"
+          archive="$RUNNER_TEMP/frontend.zip"
+          gh api "repos/hwzlikewyh/iyw-claw/actions/artifacts/$FRONTEND_ID/zip" > "$archive"
+          echo "$FRONTEND_SHA256  $archive" | shasum -a 256 -c -
+          unzip -q "$archive" -d out
+          test -s out/index.html
+          pnpm install --frozen-lockfile
+          node src-tauri/scripts/prepare-xinghe-worker.mjs --target "$TAURI_TARGET_TRIPLE"
+      - name: Import Developer ID
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -eu
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)" bash .github/scripts/release/import-apple-certificate.sh
+      - run: bash .github/scripts/release/resolve-apple-identity.sh
+      - name: Build signed app, extension and disk image
+        run: |
+          set -euo pipefail
+          [[ "$APPLE_SIGNING_IDENTITY" == *"($APPLE_TEAM_ID)" ]]
+          pnpm tauri:prepare-sidecars --target "$TAURI_TARGET_TRIPLE"
+          jq -n --arg id "$APPLE_SIGNING_IDENTITY" '{build:{beforeBuildCommand:null},bundle:{createUpdaterArtifacts:false,macOS:{signingIdentity:$id}}}' > "$RUNNER_TEMP/ci-signing.json"
+          IYW_CLAW_SKIP_SIDECAR=1 pnpm exec tauri build --features tauri-runtime --target "$TAURI_TARGET_TRIPLE" --bundles app,dmg --config "$RUNNER_TEMP/ci-signing.json"
+          bundle="src-tauri/target/$TAURI_TARGET_TRIPLE/release/bundle"
+          apps=("$bundle"/macos/*.app)
+          app="${apps[0]}"
+          req="anchor apple generic and certificate leaf[subject.OU] = \"$APPLE_TEAM_ID\""
+          codesign --verify --deep --strict -R "identifier \"app.iywclaw\" and $req" "$app"
+          codesign --verify --strict -R "$req" "$app/Contents/PlugIns/IywAssistantShare.appex"
+          for brand in iyw yun; do
+            name=原助理
+            directory=.iyw-claw
+            if [[ "$brand" == yun ]]; then name=云助理; directory=.iyw-claw-yun; fi
+            config="$app.branding"
+            mkdir -p "$config"
+            cp src-tauri/icons/128x128.png "$config/logo.png"
+            jq -n --arg id "$brand" --arg name "$name" '{brandId:$id,displayName:$name,logoFile:"logo.png"}' > "$config/branding.json"
+            "$app/Contents/MacOS/iyw-claw" --installation-brand | jq -e \
+              --arg id "$brand" --arg name "$name" --arg dir "$directory" \
+              '.productKey=="iyw-claw" and .brandId==$id and .displayName==$name and .userDirectory==$dir and .hasLogo'
+          done
+          arch_name=x64
+          [[ "$TAURI_TARGET_TRIPLE" == x86_64-* ]] || arch_name=aarch64
+          version=$(node -p "require('./package.json').version")
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$version"
+          mkdir deliver
+          base="iyw-claw_${version}_${arch_name}"
+          tar -czf "deliver/$base.app.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+          cp "$bundle"/dmg/*.dmg "deliver/$base.dmg"
+          hdiutil verify "deliver/$base.dmg"
+          printf '%s\n' "$PC_SOURCE" > deliver/source.txt
+      - if: always()
+        run: bash .github/scripts/release/cleanup-apple-keychain.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: signed-desktop-${{ matrix.target }}
+          path: deliver/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

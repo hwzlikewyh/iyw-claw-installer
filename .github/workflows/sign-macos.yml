@@ -2,6 +2,10 @@ name: Sign macOS installer
 on:
   workflow_dispatch:
     inputs:
+      desktop_candidate:
+        description: Build and sign the reviewed shared desktop candidate
+        type: boolean
+        default: false
       release_tag:
         description: Existing release containing the universal ZIP
         required: true
@@ -9,7 +13,7 @@ on:
         type: string
       source_sha256:
         description: Expected SHA-256 of the source universal ZIP
-        required: true
+        required: false
         type: string
 permissions:
   contents: read
@@ -18,7 +22,12 @@ concurrency:
   group: sign-macos-installer
   cancel-in-progress: false
 jobs:
+  desktop:
+    if: inputs.desktop_candidate
+    uses: ./.github/workflows/sign-desktop-macos.yml
+    secrets: inherit
   sign:
+    if: ${{ !inputs.desktop_candidate }}
     runs-on: macos-15
     timeout-minutes: 35
     steps:
@@ -27,7 +36,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          SOURCE_SHA256: ${{ inputs.source_sha256 }}
         run: |
+          [[ "$SOURCE_SHA256" =~ ^[[:xdigit:]]{64}$ ]] || { echo 'Expected installer ZIP digest required' >&2; exit 1; }
           mkdir -p build-signing/input
           if gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern YuanAssistant-Setup-macos-universal.zip --dir build-signing/input; then
