@@ -24,7 +24,7 @@ ARTIFACT_PREFIX = "YuanAssistant-Setup" if BRAND_ID == "iyw" else f"{BRAND_ID}-S
 if BRAND_ID != "iyw":
     PACKAGES = PACKAGES / BRAND_ID
     STAGING = STAGING / BRAND_ID
-VERSION = "0.2.22"
+VERSION = "0.2.23"
 WX_SOURCE = ROOT / ".cache/wxWidgets-3.2.12"
 
 

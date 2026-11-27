@@ -106,7 +106,8 @@ Release ResolveStableRelease(const Platform& platform, InstallJob& job) {
 Release ResolveChannelRelease(const Platform& platform, InstallJob& job,const std::string& channel) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     const auto url = std::string(FusionBase) + "/app-updates/v1/check/" + platform.target + "/" + platform.arch +
-        "/0.0.0?product=iyw-claw&runtime=desktop&channel=" + channel + "&reason=manual&t=" + std::to_string(stamp);
+        "/0.0.0?product=iyw-claw&runtime=desktop&brandId=" + Brand().id +
+        "&channel=" + channel + "&reason=manual&t=" + std::to_string(stamp);
     std::string body;
     ReadHttps(url, [&body](const char* bytes, std::size_t count) {
         if (body.size() + count > MiB) throw std::runtime_error("Fusion 版本响应过大。");
