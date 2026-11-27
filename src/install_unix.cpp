@@ -47,7 +47,7 @@ void SwapApp(const fs::path& source,FileWork& work){
 void VerifyMacBundle(const fs::path& bundle,const Release& release,const fs::path& log){
 #ifdef __APPLE__
     if(RunCommand({"/usr/bin/codesign",{"--verify","--deep","--strict","-R",
-        "identifier \"app.iywclaw\" and anchor apple generic",bundle.string()},log,60})!=0)
+        "=identifier \"app.iywclaw\" and anchor apple generic",bundle.string()},log,60})!=0)
         throw std::runtime_error("macOS 应用签名或应用标识校验失败。");
     const auto plist=bundle/"Contents/Info.plist";
     if(RunCommand({"/usr/libexec/PlistBuddy",{"-c","Print :CFBundleShortVersionString",plist.string()},log,10})!=0)

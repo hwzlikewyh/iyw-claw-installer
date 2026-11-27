@@ -13,9 +13,9 @@ jobs:
     timeout-minutes: 300
     env:
       # 固定审核过的应用源码和前端，只在本仓库的临时钥匙串中使用签名身份。
-      PC_SOURCE: 3fdd5ec0396365cecbc130e6dd78313293f7a613
-      FRONTEND_ID: '15167066940'
-      FRONTEND_SHA256: c3c3c0e3e1fce677865d3e8d0f7ff8969b537416cd96000066b90508ebbd6b32
+      PC_SOURCE: 194160e854be82c6f0fbed37a8f9781969ce91ae
+      FRONTEND_ID: '15175643306'
+      FRONTEND_SHA256: 7097703ab27d6d4ae33b29fb4d4cae60753be6a7fb136d4d1bb3285cd006dbd1
       APPLE_TEAM_ID: 393H57RCN6
       TAURI_TARGET_TRIPLE: ${{ matrix.target }}
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '64'
@@ -39,6 +39,7 @@ jobs:
           shared-key: pc-${{ matrix.target }}
           workspaces: src-tauri -> target
           cache-workspace-crates: false
+          cache-on-failure: true
       - name: Prepare the verified frontend and desktop dependencies
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,8 +72,8 @@ jobs:
           apps=("$bundle"/macos/*.app)
           app="${apps[0]}"
           req="anchor apple generic and certificate leaf[subject.OU] = \"$APPLE_TEAM_ID\""
-          codesign --verify --deep --strict -R "identifier \"app.iywclaw\" and $req" "$app"
-          codesign --verify --strict -R "$req" "$app/Contents/PlugIns/IywAssistantShare.appex"
+          codesign --verify --deep --strict -R "=identifier \"app.iywclaw\" and $req" "$app"
+          codesign --verify --strict -R "=$req" "$app/Contents/PlugIns/IywAssistantShare.appex"
           for brand in iyw yun; do
             name=原助理
             directory=.iyw-claw
@@ -83,7 +84,7 @@ jobs:
             jq -n --arg id "$brand" --arg name "$name" '{brandId:$id,displayName:$name,logoFile:"logo.png"}' > "$config/branding.json"
             "$app/Contents/MacOS/iyw-claw" --installation-brand | jq -e \
               --arg id "$brand" --arg name "$name" --arg dir "$directory" \
-              '.productKey=="iyw-claw" and .brandId==$id and .displayName==$name and .userDirectory==$dir and .hasLogo'
+              '.productKey=="iyw-claw" and .brandId==$id and .displayName==$name and .userDirectory==$dir and .hasLogo and .updateTargeting=="IYW_BRAND_TARGETING_V1"'
           done
           arch_name=x64
           [[ "$TAURI_TARGET_TRIPLE" == x86_64-* ]] || arch_name=aarch64
