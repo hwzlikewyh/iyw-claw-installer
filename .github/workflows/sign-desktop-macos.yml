@@ -13,9 +13,9 @@ jobs:
     timeout-minutes: 300
     env:
       # 固定审核过的应用源码和前端，只在本仓库的临时钥匙串中使用签名身份。
-      PC_SOURCE: 194160e854be82c6f0fbed37a8f9781969ce91ae
-      FRONTEND_ID: '15175643306'
-      FRONTEND_SHA256: 7097703ab27d6d4ae33b29fb4d4cae60753be6a7fb136d4d1bb3285cd006dbd1
+      PC_SOURCE: 783f5658d33f360684de930ce19e5cea2bfad09a
+      FRONTEND_ID: '15189715732'
+      FRONTEND_SHA256: 3d27862ca07ba79dc6d45b9128783d7a6a0e60903bf812a14f84b9fd8513a6c5
       APPLE_TEAM_ID: 393H57RCN6
       TAURI_TARGET_TRIPLE: ${{ matrix.target }}
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '64'
