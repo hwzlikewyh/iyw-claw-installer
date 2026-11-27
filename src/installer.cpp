@@ -16,12 +16,15 @@
 namespace setup {
 namespace {
 void ValidateRoot(const fs::path& root, Snapshot& result) {
-#ifndef __APPLE__
-    if(!MatchesInstalledBrand(root/"app"))
-        throw std::runtime_error("所选目录属于其他品牌，请选择本品牌的安装位置。");
-#endif
     if (root.empty() || !root.is_absolute() || root == root.root_path())
         throw std::runtime_error("请选择完整的应用文件夹路径，不要选择磁盘根目录。");
+#ifdef __APPLE__
+    const auto app = root/fs::u8path(Brand().name + ".app");
+#else
+    const auto app = root/"app";
+#endif
+    if(!MatchesInstalledBrand(app))
+        throw std::runtime_error("所选目录属于其他品牌或品牌配置无效，请选择本品牌的安装位置。");
     std::error_code error;
     auto existing = root;
     while (!fs::exists(existing, error) && !error) existing = existing.parent_path();

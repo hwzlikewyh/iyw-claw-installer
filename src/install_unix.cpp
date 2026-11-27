@@ -116,6 +116,7 @@ void FinishDeployment(FileWork& work,bool success){
         std::ifstream selected(work.staging/"selected-release.txt",std::ios::binary);
         if(selected)receipt<<selected.rdbuf();
         receipt.close();
+        RegisterLinuxLauncher(work.progress.destination);
 #endif
         if(!work.backup.empty()){
             std::error_code error;fs::remove_all(work.backup,error);

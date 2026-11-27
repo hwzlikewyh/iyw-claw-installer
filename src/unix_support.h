@@ -6,5 +6,8 @@ namespace setup {
 void ExtractApplication(FileWork& work);
 void VerifyMacBundle(const fs::path& bundle, const Release& release, const fs::path& log);
 fs::path AppExecutable(const fs::path& root);
+#ifdef __linux__
+void RegisterLinuxLauncher(const fs::path& root);
+#endif
 }
 #endif
