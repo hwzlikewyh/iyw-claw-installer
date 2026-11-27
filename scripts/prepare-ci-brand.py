@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("brand", choices=["iyw", "yun"])
+    available = sorted(p.parent.name for p in (ROOT / "brands").glob("*/brand.json")
+                       if re.fullmatch(r"[a-z][a-z0-9]{1,31}", p.parent.name))
+    parser.add_argument("brand", choices=available)
     args = parser.parse_args()
     version = re.search(r"VERSION ([0-9.]+) LANGUAGES", (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")).group(1)
     directory = ROOT / ".cache" / ("ci-brand-" + args.brand)
@@ -20,6 +22,9 @@ def main():
     subprocess.run([sys.executable, str(ROOT / "scripts/prepare-brand.py"),
                     "--config", str(ROOT / "brands" / args.brand / "brand.json"),
                     "--version", version, "--output", str(directory), *release], check=True)
+    metadata = json.loads((directory / "brand.json").read_text(encoding="utf-8"))
+    if metadata["brandId"] != args.brand:
+        raise ValueError("品牌目录与配置中的 brandId 不一致")
     resources = directory / "installer-resources"
     subprocess.run([sys.executable, str(ROOT / "scripts/apply-brand.py"),
                     str(directory), "--output", str(resources)], check=True)

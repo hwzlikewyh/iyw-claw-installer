@@ -1,5 +1,6 @@
 """从 Fusion 导出一个已绑定品牌的候选，供三端 CI 使用同一输入。"""
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -32,7 +33,14 @@ def load_candidate(options):
         value = json.loads(source.read_text(encoding="utf-8"))
         value["version"] = options.version or value.get("version", "")
         value["releaseId"] = options.release_id or value.get("releaseId", "")
-        logo = (source.parent / value["logo"]).read_bytes()
+        if "logoData" in value:
+            encoded = value.pop("logoData")
+            if not isinstance(encoded, str) or len(encoded) > 4 * ((MAX_LOGO_BYTES + 2) // 3):
+                raise ValueError("内嵌 PNG 超过大小限制")
+            logo = base64.b64decode(encoded, validate=True)
+        else:
+            with (source.parent / value["logo"]).open("rb") as stream:
+                logo = stream.read(MAX_LOGO_BYTES + 1)
         value.setdefault("logoSha256", hashlib.sha256(logo).hexdigest())
         return value, logo
     if not re.fullmatch(r"[1-9][0-9]{0,18}", options.release_id or ""):
@@ -70,7 +78,7 @@ def validate(brand, logo):
     if brand.get("promotionChannel", "stable") not in ("stable", "beta"):
         raise ValueError("晋级后的通道无效")
     name = brand["displayName"]
-    if not name or len(name) > 64 or re.search(r'[\x00-\x1f<>:"/\\|?*;]', name) or name.endswith("."):
+    if not isinstance(name, str) or not name.strip() or name != name.strip() or len(name) > 64 or re.search(r'[\x00-\x1f<>:"/\\|?*;]', name) or name.endswith(".") or name in (".", "..") or re.match(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)", name, re.I):
         raise ValueError("应用名称包含无效字符")
     if brand["releaseId"] and not re.fullmatch(r"[1-9][0-9]{0,18}", brand["releaseId"]):
         raise ValueError("候选发布 ID 无效")

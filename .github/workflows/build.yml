@@ -12,7 +12,7 @@ on:
         default: false
   push:
     branches: [main]
-    paths: ['src/**', 'resources/**', 'vendor/**', 'scripts/**', 'CMakeLists.txt', '.github/workflows/build.yml']
+    paths: ['src/**', 'resources/**', 'vendor/**', 'scripts/**', 'brands/**', 'CMakeLists.txt', '.github/workflows/build.yml']
 permissions:
   contents: read
 env:
@@ -22,11 +22,20 @@ concurrency:
   group: installers-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  brands:
+    runs-on: ubuntu-22.04
+    outputs:
+      ids: ${{ steps.list.outputs.ids }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - id: list
+        run: python scripts/list-brands.py >> "$GITHUB_OUTPUT"
   windows:
+    needs: brands
     strategy:
       fail-fast: false
       matrix:
-        brand: [iyw, yun]
+        brand: ${{ fromJSON(needs.brands.outputs.ids) }}
     runs-on: windows-2022
     timeout-minutes: 40
     steps:
@@ -64,12 +73,12 @@ jobs:
           compression-level: 0
   windows-sign:
     name: Sign Windows installer
-    needs: windows
+    needs: [brands, windows]
     if: ${{ needs.windows.result == 'success' && inputs.sign_windows }}
     strategy:
       fail-fast: false
       matrix:
-        brand: [iyw, yun]
+        brand: ${{ fromJSON(needs.brands.outputs.ids) }}
     runs-on: [self-hosted, Windows, X64, iyw-signing]
     timeout-minutes: 30
     env:
@@ -137,10 +146,11 @@ jobs:
           if-no-files-found: error
           compression-level: 0
   macos:
+    needs: brands
     strategy:
       fail-fast: false
       matrix:
-        brand: [iyw, yun]
+        brand: ${{ fromJSON(needs.brands.outputs.ids) }}
     runs-on: macos-15
     timeout-minutes: 50
     steps:
@@ -180,10 +190,11 @@ jobs:
           path: ${{ env.IYW_PACKAGE_DIR }}/*
           if-no-files-found: error
   linux:
+    needs: brands
     strategy:
       fail-fast: false
       matrix:
-        brand: [iyw, yun]
+        brand: ${{ fromJSON(needs.brands.outputs.ids) }}
         platform: [x64, arm64]
         include:
           - platform: x64

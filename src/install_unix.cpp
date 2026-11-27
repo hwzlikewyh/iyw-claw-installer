@@ -96,7 +96,8 @@ bool ReuseApplication(const Release& release,FileWork& work){
     try{VerifyMacBundle(bundle,release,work.staging/"reuse-check.log");}
     catch(const std::exception&){return false;}
 #else
-    const auto receipt=work.progress.destination/"installed-release.json";
+    const auto active=work.progress.destination/"app/.iyw-installed-release";
+    const auto receipt=fs::is_regular_file(active)?active:work.progress.destination/"installed-release.json";
     if(!fs::is_regular_file(receipt)||!fs::is_regular_file(AppExecutable(work.progress.destination))||
         !fs::is_regular_file(EnvironmentHelper(work.progress.destination)))return false;
     const auto saved=ReadOutput(receipt);

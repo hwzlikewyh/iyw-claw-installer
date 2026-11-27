@@ -2,7 +2,6 @@
 #include "diagnostics.h"
 #include "brand_identity.h"
 #include <fstream>
-#include <wx/utils.h>
 #include <algorithm>
 #include <stdexcept>
 #include <utility>
@@ -90,7 +89,6 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     if(Brand().id!="iyw"&&release.packageKind!="app_payload_zip")
         throw std::runtime_error("此公共 PC 发布缺少支持品牌安装的应用载荷，请在同一发布中补齐后重试。");
 #endif
-    wxSetEnv("IYW_CLAW_RELEASE_CHANNEL",wxString::FromUTF8(release.channel));
 #ifdef _WIN32
     work.directPayload=release.packageKind==PayloadKind;
     if(work.directPayload)LockDirectInstall(work);

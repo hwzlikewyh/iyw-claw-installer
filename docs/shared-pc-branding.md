@@ -11,7 +11,7 @@ python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.372
 python scripts/build-candidate.py --kind installer --repository . --brand-directory .cache/yun -- <现有平台构建命令>
 ```
 
-生成图标需要 Pillow。`prepare-brand.py` 也接受后台已有品牌修订导出的配置；本地配置方式不依赖品牌专用接口。
+管理台「安装引导版本 → 渠道配置」可导入配置、选择应用名称和 PNG、导出包含 Logo 的 `brand.json`。将文件放到 `brands/<brandId>/brand.json`，CI 从该目录发现渠道，在三个平台分别打向导包。也可用上述命令读取本地配置与独立 PNG。生成图标需要 Pillow。
 
 CI 的 `candidate_release_id` 可绑定同一个已登记的公共 PC 测试发布。向导检查已验证主程序中的 `IYW_INSTALLED_BRAND_V1` 能力标记，不用版本号猜测是否兼容。缺少能力时在部署前明确提示，避免安装后仍显示原助理。Windows 渠道安装使用同一公共发布的 `app_payload_zip`，不另建品牌产品。
 
@@ -30,7 +30,7 @@ CI 的 `candidate_release_id` 可绑定同一个已登记的公共 PC 测试发�
 
 PC 候选使用最终 SemVer，GitHub Release 保持 draft/prerelease，测试通过后在现有后台晋级同一发布。不得通过重新构建、改版本或替换签名文件来冒充原制品晋级。
 
-PC 复用现有 stable 查询识别已晋级的发布或更新的正式版本。`promotionChannel` 可设为 `stable` 或 `beta`；用户手动选择的更新通道优先。
+PC 使用现有 stable 查询按同一发布 ID 确认晋级。`promotionChannel` 可设为 `stable` 或 `beta`；用户手动选择的更新通道优先。
 
 CI 为原助理和云助理分别构建 Windows、macOS universal、Linux x64/arm64 向导。Windows 候选输入交给 PC 仓库的签名机，macOS 使用现有 Developer ID 证书。未提供 Apple 公证凭据时，只声明签名完成。
 
@@ -39,3 +39,5 @@ CI 为原助理和云助理分别构建 Windows、macOS universal、Linux x64/ar
 已执行定向 C++ 语法检查、Python 语法与图标生成检查；PC 只做静态审查和定向 lint，按仓库规则禁止本机构建或启动。
 
 三端 CI、签名产物、双品牌实际安装与升级均以对应流水线结果为准。候选版本尚未登记环境绑定时跳过依赖线上环境的完整安装验收；不能把编译通过等同于完整安装通过。现有线上旧 PC 包不因向导更换 Logo 就自动具备运行时品牌能力。
+
+同一 PC 版本在 beta 和 stable 下使用相同的已绑定运行环境组件。
