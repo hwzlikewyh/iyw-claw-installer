@@ -1,5 +1,6 @@
 #include "payload_elevation.h"
 #include <shellapi.h>
+#include <shlwapi.h>
 #include <fstream>
 #include <stdexcept>
 namespace setup {
@@ -49,6 +50,21 @@ void WaitWorkerReady(HANDLE worker,const fs::path& directory) {
     }
     throw std::runtime_error("安装权限助手准备超时，旧应用尚未被替换。");
 }
+}
+std::optional<int> ElevateInteractiveWizard() {
+    if (IsElevated()) return std::nullopt;
+    const auto executable = CurrentInstaller();
+    SHELLEXECUTEINFOW launch{};
+    launch.cbSize = sizeof(launch);
+    launch.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    launch.lpVerb = L"runas";
+    launch.lpFile = executable.c_str();
+    launch.lpParameters = PathGetArgsW(GetCommandLineW());
+    launch.nShow = SW_SHOWNORMAL;
+    if (ShellExecuteExW(&launch)) return ERROR_SUCCESS;
+    const auto error = GetLastError();
+    if (error == ERROR_CANCELLED) return ERROR_CANCELLED;
+    throw std::runtime_error("无法以管理员身份启动安装向导。系统错误：" + std::to_string(error));
 }
 bool DirectNeedsElevation(const fs::path& root) {
     try {

@@ -3,7 +3,11 @@
 #include "payload.h"
 #include "existing_install.h"
 #ifdef _WIN32
+#include <comdef.h>
+#include <exdisp.h>
 #include <shellapi.h>
+#include <shldisp.h>
+#include <wrl/client.h>
 #include <shlobj.h>
 #include <wincrypt.h>
 #include <array>
@@ -11,6 +15,7 @@
 #include <stdexcept>
 #include <vector>
 #include "win7_prerequisites.inc"
+#pragma comment(lib, "comsuppw.lib")
 namespace setup {
 const OSVERSIONINFOEXW& NativeWindowsVersion() {
     static const auto version=[] {
@@ -62,23 +67,6 @@ fs::path UserHome(){
         throw std::runtime_error("无法读取当前用户目录。");return fs::path(path);
 }
 fs::path EnvironmentHelper(const fs::path& root){return root/"app/iyw-environment.exe";}
-void LaunchExistingForUpdate(const fs::path& root) {
-    if (root.empty() || !root.is_absolute() || root == root.root_path()) return;
-    const auto executable = root / "app" / "iyw-claw.exe";
-    if (!fs::is_regular_file(executable)) return;
-    VerifySignature(executable);
-    SHELLEXECUTEINFOW launch{};
-    launch.cbSize = sizeof(launch);
-    launch.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
-    launch.lpVerb = L"open";
-    launch.lpFile = executable.c_str();
-    launch.lpParameters = L"--restore-installer-session";
-    const auto directory = root / "app";
-    launch.lpDirectory = directory.c_str();
-    launch.nShow = SW_SHOWNORMAL;
-    if (!ShellExecuteExW(&launch))
-        throw std::runtime_error("无法重新启动旧版本。系统错误：" + std::to_string(GetLastError()));
-}
 void InstallUnifiedInstaller(const fs::path& root) {
     wchar_t buffer[32768]{};
     constexpr DWORD capacity = static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0]));
@@ -210,16 +198,67 @@ void RequireAppVersion(const fs::path& path, const std::string& expected, FileWo
     }
     if(actual!=expected)throw std::runtime_error("应用入口版本 "+actual+" 与目标版本 "+expected+" 不一致。");
 }
+namespace {
+void LaunchFromDesktop(const fs::path& executable, bool restoreSession) {
+    using Microsoft::WRL::ComPtr;
+    struct Apartment {
+        HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        ~Apartment() { if (SUCCEEDED(result)) CoUninitialize(); }
+    } apartment;
+    const auto check = [](HRESULT result) {
+        if (result != S_OK)
+            throw std::runtime_error("无法通过 Windows 桌面启动应用。系统错误：" + std::to_string(result));
+    };
+    if (FAILED(apartment.result) && apartment.result != RPC_E_CHANGED_MODE) check(apartment.result);
+    ComPtr<IShellWindows> windows;
+    check(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_LOCAL_SERVER, IID_PPV_ARGS(&windows)));
+    _variant_t desktop(static_cast<long>(CSIDL_DESKTOP)), empty;
+    long hwnd = 0;
+    ComPtr<IDispatch> dispatch;
+    check(windows->FindWindowSW(&desktop, &empty, SWC_DESKTOP, &hwnd, SWFO_NEEDDISPATCH, &dispatch));
+    ComPtr<IServiceProvider> services;
+    check(dispatch.As(&services));
+    ComPtr<IShellBrowser> browser;
+    check(services->QueryService(SID_STopLevelBrowser, IID_PPV_ARGS(&browser)));
+    ComPtr<IShellView> view;
+    check(browser->QueryActiveShellView(&view));
+    ComPtr<IDispatch> background;
+    check(view->GetItemObject(SVGIO_BACKGROUND, IID_PPV_ARGS(&background)));
+    ComPtr<IShellFolderViewDual> folder;
+    check(background.As(&folder));
+    ComPtr<IDispatch> application;
+    check(folder->get_Application(&application));
+    ComPtr<IShellDispatch2> shell;
+    check(application.As(&shell));
+    check(shell->ShellExecute(_bstr_t(executable.c_str()), _variant_t(restoreSession ? L"--restore-installer-session" : L""),
+        _variant_t(executable.parent_path().c_str()), _variant_t(L"open"), _variant_t(static_cast<long>(SW_SHOWNORMAL))));
+}
+void StartDesktopApp(const fs::path& executable, bool restoreSession) {
+    if (IsUserAnAdmin()) {
+        LaunchFromDesktop(executable, restoreSession);
+        return;
+    }
+    STARTUPINFOW start{}; start.cb = sizeof(start); PROCESS_INFORMATION process{};
+    const auto directory = executable.parent_path();
+    std::wstring command = L"\"" + executable.wstring() + L"\"";
+    if (restoreSession) command += L" --restore-installer-session";
+    const BOOL started = CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0,
+        nullptr, directory.c_str(), &start, &process);
+    if (!started) throw std::runtime_error("启动原助理失败。系统错误：" + std::to_string(GetLastError()));
+    CloseHandle(process.hThread); CloseHandle(process.hProcess);
+}
+}
 void LaunchInstalled(const Snapshot& state, bool restoreSession) {
     if (state.phase != Phase::Complete || state.executable.empty() || !fs::is_regular_file(state.executable))
         throw std::runtime_error("安装尚未完成，无法启动原助理。");
-    STARTUPINFOW start{}; start.cb = sizeof(start); PROCESS_INFORMATION process{};
-    const auto directory = state.executable.parent_path();
-    std::wstring command = L"\"" + state.executable.wstring() + L"\"";
-    if (restoreSession) command += L" --restore-installer-session";
-    if (!CreateProcessW(state.executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr,
-        directory.c_str(), &start, &process)) throw std::runtime_error("启动原助理失败。系统错误：" + std::to_string(GetLastError()));
-    CloseHandle(process.hThread); CloseHandle(process.hProcess);
+    StartDesktopApp(state.executable, restoreSession);
+}
+void LaunchExistingForUpdate(const fs::path& root) {
+    if (root.empty() || !root.is_absolute() || root == root.root_path()) return;
+    const auto executable = root / "app" / "iyw-claw.exe";
+    if (!fs::is_regular_file(executable)) return;
+    VerifySignature(executable);
+    StartDesktopApp(executable, true);
 }
 }
 #endif

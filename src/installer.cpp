@@ -11,6 +11,7 @@
 #include "command.h"
 #include "win7_restart.h"
 #include "existing_install.h"
+#include "windows_support.h"
 #endif
 namespace setup {
 namespace {
@@ -82,7 +83,14 @@ void Execute(FileWork& work, const std::optional<UpdateRequest>& request) {
     const auto release = request ? request->release : ResolveRelease(platform, work.job);
 #ifdef _WIN32
     work.directPayload=release.packageKind==PayloadKind;
-    if(work.directPayload)LockDirectInstall(work);
+    if(work.directPayload) {
+        // 注册更新和卸载入口需要复制已签名的向导，在下载或替换应用之前检查。
+        try { VerifySignature(CurrentInstaller()); }
+        catch(const std::exception& error) {
+            throw std::runtime_error(std::string("安装向导自身的发布者签名校验失败。") + error.what());
+        }
+        LockDirectInstall(work);
+    }
     if(work.directPayload)work.needsElevation=DirectNeedsElevation(work.progress.destination);
 #endif
     {std::ofstream identity(work.staging/"selected-release.txt",std::ios::binary);

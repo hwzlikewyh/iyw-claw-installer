@@ -87,8 +87,26 @@ function Assert-RegisteredIdentity {
     }
     Invoke-PayloadRegistration -CheckOnly
 }
+function Test-PackageInUse($Failure) {
+    for ($cause = $Failure.Exception; $cause; $cause = $cause.InnerException) {
+        if ($cause.HResult -eq [int]0x80073D02 -or $cause.Message -match '\b0x80073D02\b') { return $true }
+    }
+    return $Failure.ErrorDetails.Message -match '\b0x80073D02\b'
+}
 function Add-Identity {
-    Add-AppxPackage -Path $packagePath -ExternalLocation $app -ForceUpdateFromAnyVersion -ForceTargetApplicationShutdown
+    $retryDelays = @(1, 2)
+    for ($attempt = 0; ; $attempt++) {
+        try {
+            Add-AppxPackage -Path $packagePath -ExternalLocation $app -ForceUpdateFromAnyVersion -ForceTargetApplicationShutdown
+            break
+        } catch {
+            if (!(Test-PackageInUse $_)) { throw }
+            if ($attempt -ge $retryDelays.Count) {
+                throw "Windows 应用包仍被占用（0x80073D02）。请关闭原助理及其分享窗口后重试。$($_.Exception.Message)"
+            }
+            Start-Sleep -Seconds $retryDelays[$attempt]
+        }
+    }
     Invoke-PayloadRegistration
     Assert-RegisteredIdentity
 }
@@ -99,7 +117,10 @@ function Repair-Identity {
         Add-Identity
         [Console]::Out.WriteLine('主程序身份注册与启动检查通过。')
         return
-    } catch { [Console]::Error.WriteLine("正常注册失败，准备重建当前用户身份：$($_ | Out-String)") }
+    } catch {
+        if (Test-PackageInUse $_) { throw }
+        [Console]::Error.WriteLine("正常注册失败，准备重建当前用户身份：$($_ | Out-String)")
+    }
     # 仅重建同名称、同发布者的当前用户身份。新 MSIX 和主程序已验签。
     foreach ($package in Get-IdentityPackages) {
         Remove-AppxPackage -Package $package.PackageFullName

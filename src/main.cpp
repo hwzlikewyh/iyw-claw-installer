@@ -18,7 +18,7 @@
 #include <utility>
 #include <iostream>
 #ifdef _WIN32
-#include "payload.h"
+#include "payload_elevation.h"
 #include "command.h"
 #include "win7_restart.h"
 #endif
@@ -159,13 +159,23 @@ private:
     bool OpenWizard() {
         SetAppName(wxS("原助理安装向导"));
         SetAppDisplayName(wxS("原助理安装向导"));
-        instance_=std::make_unique<wxSingleInstanceChecker>("yuan-assistant-setup-"+wxGetUserId());
-        if(instance_->IsAnotherRunning())return false;
-        wxInitAllImageHandlers();
         try {
             auto request = ParseUpdateRequest(argc, argv);
 #ifdef _WIN32
             if (!CanStartInstallation(request)) return false;
+            // 应用交接用原进程 PID 回执，静默更新也必须保留其原有调用方式。
+            if (!request || (!request->parentPid && !request->silent)) {
+                if (auto result = setup::ElevateInteractiveWizard()) {
+                    capabilityMode_ = true;
+                    processResult_ = *result;
+                    return true;
+                }
+            }
+#endif
+            instance_=std::make_unique<wxSingleInstanceChecker>("yuan-assistant-setup-"+wxGetUserId());
+            if(instance_->IsAnotherRunning())return false;
+            wxInitAllImageHandlers();
+#ifdef _WIN32
             std::optional<setup::fs::path> resumeRoot;
             if (argc == 2 && wxString(argv[1]) == wxS("--resume-after-restart")) {
                 const auto session = setup::LoadRestartSession();
