@@ -7,13 +7,13 @@
 现有配置为 `brands/iyw/brand.json` 和 `brands/yun/brand.json`。名称使用 `displayName`，PNG 文件使用相对于配置文件的 `logo` 路径。`brandId` 是稳定的本机隔离标识，发布后不得随名称变化而修改。
 
 ```sh
-python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.372 --output .cache/yun
+python scripts/prepare-brand.py --config brands/yun/brand.json --version 0.1.374 --output .cache/yun
 python scripts/build-candidate.py --kind installer --repository . --brand-directory .cache/yun -- <现有平台构建命令>
 ```
 
 管理台「安装引导版本 → 渠道配置」可导入配置、选择应用名称和 PNG、导出包含 Logo 的 `brand.json`。将文件放到 `brands/<brandId>/brand.json`，CI 从该目录发现渠道，在三个平台分别打向导包。也可用上述命令读取本地配置与独立 PNG。生成图标需要 Pillow。
 
-CI 的 `candidate_release_id` 可绑定同一个已登记的公共 PC 测试发布。向导检查已验证主程序中的 `IYW_INSTALLED_BRAND_V1` 能力标记，不用版本号猜测是否兼容。缺少能力时在部署前明确提示，避免安装后仍显示原助理。Windows 渠道安装使用同一公共发布的 `app_payload_zip`，不另建品牌产品。
+CI 的 `candidate_release_id` 可绑定同一个已登记的公共 PC 测试发布。向导检查已验证主程序中的 `IYW_BRAND_TARGETING_V1` 能力标记，确认它支持品牌配置和按品牌查询更新。Windows 渠道安装使用同一公共发布的 `app_payload_zip`。
 
 指定 `--release-id` 后，向导使用现有版本查询接口的 beta 通道，并核对返回的发布 ID。正式向导使用 stable。后台将同一发布晋级后，候选向导可取得同一 ID 的 stable 制品。若该候选已被其他测试版替代且不在当前 stable 中，向导明确要求取得当前配置。
 
@@ -41,3 +41,5 @@ CI 为原助理和云助理分别构建 Windows、macOS universal、Linux x64/ar
 三端 CI、签名产物、双品牌实际安装与升级均以对应流水线结果为准。候选版本尚未登记环境绑定时跳过依赖线上环境的完整安装验收；不能把编译通过等同于完整安装通过。现有线上旧 PC 包不因向导更换 Logo 就自动具备运行时品牌能力。
 
 同一 PC 版本在 beta 和 stable 下使用相同的已绑定运行环境组件。
+
+公共 PC 0.1.374 和向导 0.2.23 在更新请求中携带 brandId。后台可按每个发布勾选允许接收更新的品牌。测试版转正式版沿用已保存范围；客户端在安装预下载的更新前重新检查范围。
